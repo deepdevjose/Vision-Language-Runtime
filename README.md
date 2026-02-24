@@ -188,7 +188,6 @@ Camera access requires HTTPS. Use `https://` or run on `localhost` for testing
 **Model & Framework:**
 - [FastVLM-0.5B-ONNX](https://huggingface.co/onnx-community/FastVLM-0.5B-ONNX) by ONNX Community
 - [Transformers.js](https://huggingface.co/docs/transformers.js) by Hugging Face
-- [Original React implementation](https://huggingface.co/spaces/apple/fastvlm-webgpu) by Apple/Hugging Face
 
 **This version:**
 - Rewritten in vanilla JS by a devdepressed or whatever my name so doing things
