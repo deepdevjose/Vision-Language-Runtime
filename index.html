@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+    <meta name="description" content="Vision-language inference runtime powered by WebGPU">
+    <meta name="theme-color" content="#0F0F0F">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Vision-Language Runtime</title>
+    
+    <!-- Preconnect to CDN for faster resource loading -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+    <!-- Preconnect to Hugging Face for model downloads -->
+    <link rel="preconnect" href="https://huggingface.co" crossorigin>
+    <link rel="dns-prefetch" href="https://huggingface.co">
+    
+    <!-- Inter font for Apple-like typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="icon" type="image/x-icon" href="../favicon.png">
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/components.css">
+</head>
+<body>
+    <div id="root"></div>
+    
+    <!-- Import Transformers.js from CDN -->
+    <script type="importmap">
+    {
+        "imports": {
+            "@huggingface/transformers": "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2/dist/transformers.min.js"
+        }
+    }
+    </script>
+    
+    <!-- WebGPU Feature Detection (runs early for FP16 check) -->
+    <script type="module">
+        import webgpuDetector from './js/utils/webgpu-detector.js';
+        // Early detection to warn users if WebGPU/FP16 unavailable
+        webgpuDetector.detect().catch(err => {
+            console.error('⚠️ GPU detection failed:', err);
+        });
+    </script>
+    
+    <!-- Main application entry point -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
