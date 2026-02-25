@@ -115,7 +115,10 @@ http://YOUR_LOCAL_IP:8000
 - 🎭 Live ASCII art background from camera feed
 - ⚡ GPU-accelerated with WebGPU + FP16 support
 - 📊 Performance optimizations: warmup, dynamic FPS, backpressure
-- 🔧 Developer tools: diagnostics panel, logger, type checking
+- � Freeze frame to analyze static images
+- 📜 Caption history (last 20 captions with JSON export)
+- 🎥 Camera switching and auto-recovery with exponential backoff
+- 🔧 Developer tools: diagnostics panel (`Ctrl+Shift+D`), logger, type checking
 - 🔗 Smart URL detection with security confirmation
 - 📱 Enhanced Safari/iOS camera error messages
 - 🖼️ Image upload fallback (for devices without WebGPU)
