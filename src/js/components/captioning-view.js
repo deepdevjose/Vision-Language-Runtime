@@ -4,14 +4,53 @@
  */
 
 import { createElement, sleep } from '../utils/dom-helpers.js';
-import { createDraggableContainer } from './DraggableContainer.js';
-import { createPromptInput } from './PromptInput.js';
-import { createLiveCaption } from './LiveCaption.js';
-import { createWebcamCapture } from './WebcamCapture.js';
+import { createDraggableContainer } from './draggable-container.js';
+import { createPromptInput } from './prompt-input.js';
+import { createLiveCaption } from './live-caption.js';
+import { createWebcamCapture } from './webcam-capture.js';
+import { createCaptionHistory } from './caption-history.js';
+import { createFreezeFrame } from './freeze-frame.js';
+import { createURLList } from './url-display.js';
+import { processTextWithURLs } from '../utils/url-sanitizer.js';
 import { TIMING, PROMPTS, MODEL_CONFIG } from '../utils/constants.js';
+import logger from '../utils/logger.js';
 
 // Lazy load vlmService (it's already loaded by LoadingScreen)
 let vlmService = null;
+
+/**
+ * Post-process caption to clean up common artifacts
+ */
+function postProcessCaption(text) {
+    if (!text) return text;
+    
+    let cleaned = text;
+    
+    // Normalize spaces (multiple spaces -> single space)
+    cleaned = cleaned.replace(/\s+/g, ' ');
+    
+    // Remove trailing/leading spaces
+    cleaned = cleaned.trim();
+    
+    // Remove repetitive phrases (e.g., "The image shows the image shows...")
+    // Match repeated sequences of 3+ words
+    cleaned = cleaned.replace(/\b(\w+\s+\w+\s+\w+)(\s+\1)+/gi, '$1');
+    
+    // Remove common filler artifacts ("uh", "...", excessive punctuation)
+    cleaned = cleaned.replace(/\buh+\b/gi, '');
+    cleaned = cleaned.replace(/\.{3,}/g, '...');
+    cleaned = cleaned.replace(/!{2,}/g, '!');
+    cleaned = cleaned.replace(/\?{2,}/g, '?');
+    
+    // Fix spacing around punctuation
+    cleaned = cleaned.replace(/\s+([.,!?])/g, '$1');
+    cleaned = cleaned.replace(/([.,!?])(\w)/g, '$1 $2');
+    
+    // Final trim
+    cleaned = cleaned.trim();
+    
+    return cleaned;
+}
 
 export function createCaptioningView(videoElement) {
     const container = createElement('div', {
@@ -33,6 +72,21 @@ export function createCaptioningView(videoElement) {
 
     // Create components
     const liveCaptionComponent = createLiveCaption();
+    
+    // Caption history (desktop only)
+    const captionHistoryComponent = !isMobile ? createCaptionHistory() : null;
+    
+    // Freeze frame component
+    const freezeFrameComponent = createFreezeFrame(
+        () => {
+            // On freeze
+            if (MODEL_CONFIG.DEBUG) console.log('🧊 Frame frozen');
+        },
+        () => {
+            // On unfreeze
+            if (MODEL_CONFIG.DEBUG) console.log('▶️ Frame resumed');
+        }
+    );
     
     // Prompt focus handler for conditional visibility
     const handlePromptFocus = (focused) => {
@@ -103,7 +157,7 @@ export function createCaptioningView(videoElement) {
 
         // Lazy load vlmService if not already loaded
         if (!vlmService) {
-            const module = await import('../services/vlm-service.js');
+            const module = await import('../services/vision-language-service.js');
             vlmService = module.default;
         }
 
@@ -119,10 +173,25 @@ export function createCaptioningView(videoElement) {
 
         const captureLoop = async () => {
             while (!signal.aborted && isRunning) {
+                // Check if frozen - skip inference if in freeze mode
+                if (freezeFrameComponent.isFrozen()) {
+                    await sleep(500, signal).catch(() => {});
+                    continue;
+                }
+                
                 if (videoElement && videoElement.readyState >= 2 && videoElement.videoWidth > 0) {
                     // Ensure video is always playing
                     if (videoElement.paused) {
                         await videoElement.play().catch(err => console.error('Failed to resume video in loop:', err));
+                    }
+                    
+                    // BACKPRESSURE: Check if inference is already running
+                    // Don't queue up frames - skip if busy
+                    const serviceState = vlmService.getLoadedState();
+                    if (vlmService.inferenceLock) {
+                        if (MODEL_CONFIG.DEBUG) console.log('⏭️ Skipping frame - inference still running');
+                        await sleep(500, signal).catch(() => {});
+                        continue;
                     }
                     
                     try {
@@ -152,16 +221,28 @@ export function createCaptioningView(videoElement) {
                         if (MODEL_CONFIG.DEBUG) console.log(`⏱️ Inference completed in ${elapsedTime}s`);
 
                         if (result && !signal.aborted) {
-                            liveCaptionComponent.updateCaption(result, false);
+                            // Post-process caption: clean up artifacts
+                            const cleanedResult = postProcessCaption(result);
+                            liveCaptionComponent.updateCaption(cleanedResult, false);
                             webcamCaptureComponent.updateStatus(`✅ Ready (last: ${elapsedTime}s)`);
+                            
+                            // Add to history (desktop only)
+                            if (captionHistoryComponent) {
+                                captionHistoryComponent.addCaption(
+                                    cleanedResult, 
+                                    currentPrompt, 
+                                    freezeFrameComponent.isFrozen()
+                                );
+                            }
                         }
                         
-                        // Wait before next capture to prevent GPU saturation
-                        // (tried 0ms delay once, GPU usage went to 100%, fans sounded like a jet engine)
+                        // DYNAMIC FPS: Wait based on actual inference time
+                        // If inference takes 2s, don't capture every 100ms
                         if (!signal.aborted) {
-                            if (MODEL_CONFIG.DEBUG) console.log(`⏸️ Waiting ${TIMING.FRAME_CAPTURE_DELAY/1000}s before next capture...`);
+                            const dynamicDelay = vlmService.getDynamicFrameDelay();
+                            if (MODEL_CONFIG.DEBUG) console.log(`⏸️ Dynamic wait: ${(dynamicDelay/1000).toFixed(1)}s (based on avg inference time)`);
                             try {
-                                await sleep(TIMING.FRAME_CAPTURE_DELAY, signal);
+                                await sleep(dynamicDelay, signal);
                             } catch (err) {
                                 // Sleep was aborted, exit loop
                                 if (err.name === 'AbortError') break;
@@ -205,6 +286,18 @@ export function createCaptioningView(videoElement) {
     innerContainer.appendChild(webcamCaptureComponent);
     innerContainer.appendChild(promptDraggable);
     innerContainer.appendChild(captionDraggable);
+    
+    // Add history component (desktop only)
+    if (captionHistoryComponent) {
+        innerContainer.appendChild(captionHistoryComponent.element);
+    }
+    
+    // Add freeze frame button to webcam controls
+    const webcamControls = webcamCaptureComponent.querySelector('.webcam-controls-row');
+    if (webcamControls) {
+        webcamControls.appendChild(freezeFrameComponent.element);
+    }
+    
     container.appendChild(innerContainer);
 
     // Cleanup function

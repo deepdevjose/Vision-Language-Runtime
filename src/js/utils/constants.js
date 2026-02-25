@@ -52,8 +52,28 @@ export const PROMPTS = {
         'What emotions or actions are being portrayed?',
         'Name the object I am holding in my hand.'
     ],
+    // Extended prompt presets for better UX
+    presets: {
+        'Describe scene': 'Describe everything you see in detail.',
+        'Read text': 'Read and transcribe all visible text in the image.',
+        'Count objects': 'Count and list all distinct objects you can see.',
+        'Explain UI': 'Describe the user interface elements and layout you see.',
+        'Spanish': 'Describe lo que ves en español (responde en español).',
+        'Chinese': '用中文描述你看到的内容。',
+        'French': 'Décris ce que tu vois en français.',
+        'Identify colors': 'List all the main colors you can identify.',
+        'Detect emotions': 'Describe the emotions or mood conveyed in the scene.',
+        'Find text': 'Is there any text visible? If so, what does it say?'
+    },
     fallbackCaption: 'Waiting for first caption...',
     processingMessage: 'Starting analysis...'
+};
+
+// Language detection keywords (for auto-language feature)
+export const LANGUAGE_KEYWORDS = {
+    spanish: ['español', 'qué', 'cómo', 'dónde', 'cuándo', 'por qué', 'describir', 'explicar'],
+    chinese: ['什么', '怎么', '哪里', '为什么', '描述', '解释'],
+    french: ['français', 'quoi', 'comment', 'où', 'quand', 'pourquoi', 'décrire']
 };
 
 // Model configuration

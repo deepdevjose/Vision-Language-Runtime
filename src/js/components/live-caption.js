@@ -3,8 +3,11 @@
  */
 
 import { createElement, addClass, removeClass } from '../utils/dom-helpers.js';
-import { createGlassContainer } from './GlassContainer.js';
+import { createGlassContainer } from './glass-container.js';
+import { createURLList } from './url-display.js';
+import { processTextWithURLs } from '../utils/url-sanitizer.js';
 import { PROMPTS } from '../utils/constants.js';
+import logger from '../utils/logger.js';
 
 export function createLiveCaption() {
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
@@ -143,6 +146,9 @@ export function createLiveCaption() {
         text: PROMPTS.fallbackCaption
     });
 
+    // URL container (added dynamically when URLs are detected)
+    let urlContainer = null;
+
     content.appendChild(captionText);
 
     // Assemble container
@@ -197,13 +203,32 @@ export function createLiveCaption() {
     container.updateCaption = (caption, isStreaming = false) => {
         if (isPaused) return; // Don't update if paused
         
+        // Remove existing URL container if present
+        if (urlContainer) {
+            urlContainer.remove();
+            urlContainer = null;
+        }
+        
+        // Process text for URLs
+        const processed = processTextWithURLs(caption || PROMPTS.fallbackCaption);
+        
         // Trigger fade-in animation by removing and re-adding
         captionText.style.animation = 'none';
         // Force reflow to restart animation
         void captionText.offsetHeight;
         captionText.style.animation = '';
         
-        captionText.textContent = caption || PROMPTS.fallbackCaption;
+        // Set caption text (with URL placeholders)
+        captionText.textContent = processed.text;
+        
+        // Add URL component if URLs were detected
+        if (processed.urls.length > 0) {
+            logger.info('URLs detected in caption', { count: processed.urls.length });
+            urlContainer = createURLList(processed.urls);
+            if (urlContainer) {
+                content.appendChild(urlContainer);
+            }
+        }
 
         if (isStreaming) {
             addClass(captionText, 'live-caption-streaming');

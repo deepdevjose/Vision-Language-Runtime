@@ -3,7 +3,7 @@
  */
 
 import { createElement, addClass, removeClass } from '../utils/dom-helpers.js';
-import { createGlassContainer } from './GlassContainer.js';
+import { createGlassContainer } from './glass-container.js';
 import { PROMPTS } from '../utils/constants.js';
 
 export function createPromptInput(onPromptChange, onFocusChange) {
@@ -94,6 +94,42 @@ export function createPromptInput(onPromptChange, onFocusChange) {
         }, 150);
     });
 
+    // Presets Section (new feature for quick access)
+    const presetsLabel = createElement('p', {
+        className: 'text-sm text-gray-400 mt-3 mb-2 font-semibold',
+        text: 'Quick Presets:',
+        style: { display: isMobile ? 'none' : 'block' }
+    });
+
+    const presetsContainer = createElement('div', {
+        className: 'prompt-suggestions'
+    });
+
+    // Add preset chips
+    Object.entries(PROMPTS.presets || {}).forEach(([label, prompt]) => {
+        const chip = createElement('button', {
+            className: 'prompt-suggestion-chip preset-chip',
+            text: label
+        });
+
+        chip.addEventListener('click', (e) => {
+            e.stopPropagation();
+            textarea.value = prompt;
+            onPromptChange?.(prompt);
+            if (isMobile) {
+                textarea.focus();
+                setTimeout(() => {
+                    textarea.blur();
+                    if (isExpanded) toggleExpand();
+                }, 100);
+            } else {
+                textarea.focus();
+            }
+        });
+
+        presetsContainer.appendChild(chip);
+    });
+
     const suggestionsLabel = createElement('p', {
         className: 'text-sm text-gray-400 mt-3 mb-2',
         text: 'Suggestions:',
@@ -131,6 +167,8 @@ export function createPromptInput(onPromptChange, onFocusChange) {
 
     content.appendChild(label);
     content.appendChild(textarea);
+    content.appendChild(presetsLabel);
+    content.appendChild(presetsContainer);
     content.appendChild(suggestionsLabel);
     content.appendChild(suggestionsContainer);
 

@@ -45,14 +45,16 @@ Camera → WebGPU → FastVLM-0.5B → Live captions
 
 ## Quick start
 
+### Local Development
+
 ```bash
 # Clone the repo
 git clone <repository-url>
-cd fastvlm-webgpu-main
+cd Vision-Language-Runtime
 
 # Start a local server (CORS requirement)
+cd src
 python -m http.server 8000
-# or: npx http-server -p 8000
 
 # Open browser
 http://localhost:8000
@@ -63,6 +65,17 @@ http://localhost:8000
 - Camera/webcam
 - Local server (no file:// protocol)
 - **HTTPS connection** (or localhost) - required for camera access on mobile devices
+
+### Deploy to Production
+
+**Zero configuration deployment** - no build step needed!
+
+```
+Build command:        (empty)
+Build output directory: src
+```
+
+See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed instructions for Cloudflare Pages, Vercel, Netlify, and more.
 
 ---
 
@@ -81,15 +94,15 @@ http://localhost:8000
 ipconfig  # Windows
 ifconfig  # Mac/Linux
 
-# Start server
+# Start server from src/
+cd src
 python -m http.server 8000
 
-# Access from mobile
-https://YOUR_LOCAL_IP:8000
-
-# Or use ngrok for HTTPS tunnel
-ngrok http 8000
+# Access from mobile browser
+http://YOUR_LOCAL_IP:8000
 ```
+
+**Recommended:** Deploy to Cloudflare Pages (free) for instant HTTPS and global CDN.
 
 ---
 
@@ -98,9 +111,14 @@ ngrok http 8000
 - ✨ Real-time visual inference (1-3s per frame)
 - 🎨 Monochromatic glass UI (Apple/WWDC vibes)
 - 🔒 100% on-device processing
-- 📝 Custom prompts for flexible queries
+- 📝 Custom prompts for flexible queries + 10 multilingual presets
 - 🎭 Live ASCII art background from camera feed
-- ⚡ GPU-accelerated with WebGPU
+- ⚡ GPU-accelerated with WebGPU + FP16 support
+- 📊 Performance optimizations: warmup, dynamic FPS, backpressure
+- 🔧 Developer tools: diagnostics panel, logger, type checking
+- 🔗 Smart URL detection with security confirmation
+- 📱 Enhanced Safari/iOS camera error messages
+- 🖼️ Image upload fallback (for devices without WebGPU)
 
 ---
 
@@ -160,7 +178,7 @@ Open browser console on first load - you'll see WebGPU detection results includi
 ## Troubleshooting
 
 **WebGPU not available?**  
-Update your browser or check [webgpu.io](https://webgpu.io) for compatibility
+Update your browser or check [webgpu.io](https://webgpu.io) for compatibility. The app will automatically switch to image upload mode as a fallback.
 
 **Model won't load?**  
 Clear cache, check console for CORS errors, verify internet connection
@@ -170,16 +188,38 @@ Lower `MAX_INFERENCE_SIZE`, increase `FRAME_CAPTURE_DELAY`, or close other GPU a
 
 **Camera blocked on mobile?**  
 - **Most common:** Not using HTTPS (required on mobile browsers)
+- **Safari/iOS:** Go to Settings → Safari → Camera → Allow
 - Check browser permissions: Settings → Site Permissions → Camera
 - Reload the page after granting permissions
 - Make sure no other app is using the camera
 - Try in incognito mode to rule out extension conflicts
 
 **Camera blocked on desktop?**  
-Check browser permissions and reload
+Check browser permissions and reload. See detailed error messages in the UI for specific guidance.
 
 **"Insecure Connection" warning?**  
 Camera access requires HTTPS. Use `https://` or run on `localhost` for testing
+
+**URLs in captions?**  
+Click the URL badge to open with security confirmation. Never open untrusted links!
+
+---
+
+## Developer Tools (Optional)
+
+The project includes optional development tools for testing and type checking:
+
+```bash
+# Install dev dependencies (optional - not needed for deployment)
+npm install
+
+# Run tests (optional)
+npm run test:unit      # Unit tests
+npm run test:e2e       # E2E tests with Playwright
+npm run type-check     # TypeScript type checking
+```
+
+**Important:** These are **only for development**. The production app has **zero dependencies** and runs as pure static HTML/CSS/JS.
 
 ---
 
@@ -191,7 +231,7 @@ Camera access requires HTTPS. Use `https://` or run on `localhost` for testing
 
 **This version:**
 - Rewritten in vanilla JS by a devdepressed or whatever my name so doing things
-- Any frameworks. I hate `npm install`. It's just me, WebGPU, and the model. No middlemen.
+- No frameworks. I hate `npm install`. It's just me, WebGPU, and the model. No middlemen.
 - Performance optimizations porque mi GPU no es tan buena
 - Apple aesthetic porque me gusta cómo se ve
 

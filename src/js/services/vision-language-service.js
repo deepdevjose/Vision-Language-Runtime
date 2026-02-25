@@ -17,6 +17,10 @@ class VLMService {
         this.inferenceLock = false;
         this.canvas = null;
         this.ctx = null;  // Cache canvas context
+        this.warmedUp = false;
+        this.lastInferenceTime = 0;
+        this.avgInferenceTime = 3000; // Initial estimate: 3s
+        this.inferenceHistory = []; // Track last 5 inference times
     }
 
     async loadModel(onProgress) {
@@ -88,6 +92,11 @@ class VLMService {
 
                 onProgress?.('Model loaded successfully!', 80);
                 this.isLoaded = true;
+                
+                // Warmup: Run 1-2 dummy inferences to stabilize latencies
+                onProgress?.('Warming up inference pipeline...', 85);
+                await this.performWarmup();
+                onProgress?.('Warmup complete!', 95);
             } catch (error) {
                 console.error('Error loading model:', error);
                 throw error;
@@ -100,6 +109,44 @@ class VLMService {
         return this.loadPromise;
     }
 
+    async performWarmup() {
+        if (this.warmedUp) return;
+        
+        try {
+            console.log('🔥 Starting model warmup...');
+            
+            // Create dummy canvas with small test image
+            const warmupCanvas = document.createElement('canvas');
+            warmupCanvas.width = 320;
+            warmupCanvas.height = 240;
+            const ctx = warmupCanvas.getContext('2d');
+            ctx.fillStyle = '#808080';
+            ctx.fillRect(0, 0, 320, 240);
+            
+            // Create dummy video element
+            const dummyVideo = document.createElement('video');
+            dummyVideo.width = 320;
+            dummyVideo.height = 240;
+            
+            // Simple dummy prompt
+            const dummyPrompt = 'Describe this.';
+            
+            // Run 2 warmup inferences
+            for (let i = 0; i < 2; i++) {
+                const startTime = performance.now();
+                await this._runInferenceCore(warmupCanvas, dummyPrompt, null, true);
+                const elapsed = performance.now() - startTime;
+                console.log(`🔥 Warmup inference ${i + 1}/2 completed in ${(elapsed/1000).toFixed(2)}s`);
+            }
+            
+            this.warmedUp = true;
+            console.log('✅ Warmup complete - inference pipeline stabilized');
+        } catch (error) {
+            console.warn('⚠️ Warmup failed (non-critical):', error);
+            // Don't throw - warmup failure is not critical
+        }
+    }
+
     async runInference(video, instruction, onTextUpdate) {
         // Prevents concurrent inference calls (GPU doesn't like multitasking this hard)
         if (this.inferenceLock) {
@@ -108,6 +155,7 @@ class VLMService {
         }
 
         this.inferenceLock = true;
+        const startTime = performance.now();
         if (MODEL_CONFIG.DEBUG) console.log('🔒 Inference lock acquired');
 
         if (!this.processor || !this.model) {
@@ -117,15 +165,40 @@ class VLMService {
         }
 
         try {
-            if (MODEL_CONFIG.DEBUG) console.log('🎥 Starting inference with prompt:', instruction);
+            const result = await this._runInferenceCore(video, instruction, onTextUpdate, false);
             
-            // Create canvas if it doesn't exist
-            if (!this.canvas) {
-                this.canvas = document.createElement('canvas');
-                this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
+            // Track inference time for dynamic FPS adjustment
+            const elapsedTime = performance.now() - startTime;
+            this.lastInferenceTime = elapsedTime;
+            this.inferenceHistory.push(elapsedTime);
+            if (this.inferenceHistory.length > 5) {
+                this.inferenceHistory.shift();
             }
+            this.avgInferenceTime = this.inferenceHistory.reduce((a, b) => a + b, 0) / this.inferenceHistory.length;
+            
+            if (MODEL_CONFIG.DEBUG) console.log(`⏱️ Inference took ${(elapsedTime/1000).toFixed(2)}s (avg: ${(this.avgInferenceTime/1000).toFixed(2)}s)`);
+            
+            this.inferenceLock = false;
+            if (MODEL_CONFIG.DEBUG) console.log('🔓 Inference lock released (success)');
+            return result;
+        } catch (error) {
+            console.error('❌ Inference error:', error);
+            this.inferenceLock = false;
+            if (MODEL_CONFIG.DEBUG) console.log('🔓 Inference lock released (error)');
+            throw error;
+        }
+    }
 
-            // Calculate scaled dimensions to reduce inference cost
+    async _runInferenceCore(video, instruction, onTextUpdate, isWarmup = false) {
+        if (!isWarmup && MODEL_CONFIG.DEBUG) console.log('🎥 Starting inference with prompt:', instruction);
+        
+        // Create canvas if it doesn't exist
+        if (!this.canvas) {
+            this.canvas = document.createElement('canvas');
+            this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
+        }
+
+        // Calculate scaled dimensions to reduce inference cost
             // Keep aspect ratio but limit max dimension to MAX_INFERENCE_SIZE
             // (640px is the sweet spot - tested higher values, GPU starts crying)
             const videoWidth = video.videoWidth;
@@ -224,7 +297,7 @@ class VLMService {
                 repetition_penalty: 1.2
             });
             
-            if (MODEL_CONFIG.DEBUG) console.log(`✅ Model output generated (${maxTokens} max tokens)`);
+            if (MODEL_CONFIG.DEBUG && !isWarmup) console.log(`✅ Model output generated (${maxTokens} max tokens)`);
 
             // If streaming worked, use that result to avoid redundant decoding
             const finalText = streamed.trim() || this.processor.batch_decode(
@@ -232,23 +305,28 @@ class VLMService {
                 { skip_special_tokens: true }
             )[0].trim();
 
-            if (MODEL_CONFIG.DEBUG) console.log('💬 Final caption:', finalText);
+            if (MODEL_CONFIG.DEBUG && !isWarmup) console.log('💬 Final caption:', finalText);
             
-            this.inferenceLock = false;
-            if (MODEL_CONFIG.DEBUG) console.log('🔓 Inference lock released (success)');
             return finalText;
-        } catch (error) {
-            console.error('❌ Inference error:', error);
-            this.inferenceLock = false;
-            if (MODEL_CONFIG.DEBUG) console.log('🔓 Inference lock released (error)');
-            throw error;
-        }
+    }
+
+    getDynamicFrameDelay() {
+        // Calculate optimal delay based on average inference time
+        // If inference takes 2s, don't try to capture every 100ms
+        // Add 20% buffer to prevent queue buildup
+        const recommendedDelay = Math.max(
+            1000, // Minimum 1s between captures
+            this.avgInferenceTime * 1.2
+        );
+        return recommendedDelay;
     }
 
     getLoadedState() {
         return {
             isLoaded: this.isLoaded,
-            isLoading: this.isLoading
+            isLoading: this.isLoading,
+            warmedUp: this.warmedUp,
+            avgInferenceTime: this.avgInferenceTime
         };
     }
 }

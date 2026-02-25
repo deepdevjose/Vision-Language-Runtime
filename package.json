@@ -1,0 +1,34 @@
+{
+  "name": "vision-language-runtime",
+  "version": "1.0.0",
+  "description": "Vision-language inference runtime powered by WebGPU",
+  "type": "module",
+  "scripts": {
+    "dev": "http-server src -p 8000 -o -c-1",
+    "start": "http-server src -p 8000 -c-1",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "node tests/state-manager.test.js && node tests/caption-normalizer.test.js",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "lint": "eslint src/js/**/*.js",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "webgpu",
+    "vision-language",
+    "ai",
+    "transformers",
+    "vlm"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^20.10.0",
+    "eslint": "^8.55.0",
+    "http-server": "^14.1.1",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {}
+}

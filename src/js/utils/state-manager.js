@@ -1,12 +1,35 @@
+// @ts-check
+
+/**
+ * @typedef {Object} StateChangeDetail
+ * @property {Object} state - Current state
+ * @property {Object} prevState - Previous state
+ * @property {Object} updates - Updates applied
+ */
+
+/**
+ * @typedef {(detail: StateChangeDetail) => void} StateChangeCallback
+ */
+
 /**
  * Simple state manager with event emitting
+ * Provides reactive state management with type safety
  */
 class StateManager extends EventTarget {
+    /**
+     * @param {Object} [initialState={}] - Initial state object
+     */
     constructor(initialState = {}) {
         super();
+        /** @type {Object} */
         this.state = { ...initialState };
     }
 
+    /**
+     * Update state with new values
+     * @param {Object} updates - Partial state updates
+     * @returns {Object} New state
+     */
     setState(updates) {
         const prevState = { ...this.state };
         const newState = { ...this.state, ...updates };
@@ -31,10 +54,19 @@ class StateManager extends EventTarget {
         return this.state;
     }
 
+    /**
+     * Get current state (returns copy)
+     * @returns {Object} Current state
+     */
     getState() {
         return { ...this.state };
     }
 
+    /**
+     * Subscribe to state changes
+     * @param {StateChangeCallback} callback - Callback function
+     * @returns {() => void} Unsubscribe function
+     */
     subscribe(callback) {
         const listener = (event) => callback(event.detail);
         this.addEventListener('statechange', listener);

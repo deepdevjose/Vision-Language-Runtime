@@ -1,0 +1,29 @@
+# Development files
+node_modules/
+package.json
+package-lock.json
+tsconfig.json
+playwright.config.js
+
+# Tests
+tests/
+
+# Documentation (optional - remove if you want docs deployed)
+docs/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini

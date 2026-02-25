@@ -148,7 +148,7 @@ export function createLoadingScreen(onComplete) {
             progress = 8;
             updateUI();
             
-            const { default: vlmService } = await import('../services/vlm-service.js');
+            const { default: vlmService } = await import('../services/vision-language-service.js');
             
             // Load the model
             await vlmService.loadModel((message, progressPercent) => {

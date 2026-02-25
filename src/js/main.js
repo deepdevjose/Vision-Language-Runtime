@@ -7,13 +7,16 @@
 
 import StateManager from './utils/state-manager.js';
 import { clearChildren, createElement } from './utils/dom-helpers.js';
-import { createWebcamPermissionDialog } from './components/WebcamPermissionDialog.js';
-import { createWelcomeScreen } from './components/WelcomeScreen.js';
-import { createLoadingScreen } from './components/LoadingScreen.js';
-import { createCaptioningView } from './components/CaptioningView.js';
-import { createAsciiBackground } from './components/AsciiBackground.js';
+import { createWebcamPermissionDialog } from './components/webcam-permission-dialog.js';
+import { createWelcomeScreen } from './components/welcome-screen.js';
+import { createLoadingScreen } from './components/loading-screen.js';
+import { createCaptioningView } from './components/captioning-view.js';
+import { createImageUpload, fileToCanvas } from './components/image-upload.js';
+import { createAsciiBackground } from './components/ascii-background.js';
+import { createDiagnosticsPanel } from './components/diagnostics-panel.js';
 import { getStream, onStreamEnded } from './services/webcam-service.js';
 import webgpuDetector from './utils/webgpu-detector.js';
+import logger from './utils/logger.js';
 
 // =============================
 // Early GPU Detection
@@ -23,14 +26,20 @@ import webgpuDetector from './utils/webgpu-detector.js';
  * Detect WebGPU and FP16 support early
  * This runs before anything else to verify GPU capabilities
  */
+let hasWebGPU = false;
 (async () => {
     try {
         const gpuInfo = await webgpuDetector.detect();
+        hasWebGPU = gpuInfo.supported;
         if (gpuInfo.fp16Available) {
             console.log('🚀 FP16 enabled - expect 2× faster inference!');
         }
+        if (!hasWebGPU) {
+            console.warn('⚠️ WebGPU not available - will use image upload fallback mode');
+        }
     } catch (error) {
         console.error('GPU detection failed:', error);
+        hasWebGPU = false;
     }
 })();
 
@@ -41,7 +50,8 @@ import webgpuDetector from './utils/webgpu-detector.js';
 const stateManager = new StateManager({
     appState: 'requesting-permission',
     webcamStream: null,
-    isVideoReady: false
+    isVideoReady: false,
+    hasWebGPU: true  // Assume true initially, updated after detection
 });
 
 const root = document.getElementById('root');
@@ -182,7 +192,13 @@ function render(state) {
 
         case 'welcome':
             currentComponent = createWelcomeScreen(() => {
-                stateManager.setState({ appState: 'loading' });
+                // Check if WebGPU is available
+                if (hasWebGPU) {
+                    stateManager.setState({ appState: 'loading' });
+                } else {
+                    logger.warn('WebGPU not available - using image upload mode');
+                    stateManager.setState({ appState: 'image-upload' });
+                }
             });
             root.appendChild(currentComponent);
             break;
@@ -208,6 +224,62 @@ function render(state) {
             }
             
             currentComponent = createCaptioningView(videoElement);
+            root.appendChild(currentComponent);
+            break;
+
+        case 'image-upload':
+            // Fallback mode for devices without WebGPU
+            currentComponent = createImageUpload(async (file) => {
+                try {
+                    logger.info('Processing uploaded image', { file: file.name });
+                    
+                    // Convert file to canvas
+                    const canvas = await fileToCanvas(file);
+                    
+                    // TODO: Run inference on the uploaded image
+                    // This would require modifying vision-language-service to accept canvas
+                    // For now, just show a message
+                    
+                    const resultOverlay = createElement('div', {
+                        className: 'fixed inset-0 bg-black/80 flex items-center justify-center z-[9999]'
+                    });
+                    
+                    const resultContent = createElement('div', {
+                        className: 'glass-container p-8 max-w-2xl mx-4'
+                    });
+                    
+                    const resultTitle = createElement('h3', {
+                        className: 'text-2xl font-light mb-4',
+                        textContent: '❌ Not Supported Yet'
+                    });
+                    
+                    const resultText = createElement('p', {
+                        className: 'text-sm opacity-80 mb-6',
+                        textContent: 'Image upload analysis requires WebGPU support, which is not available on your device. This feature is planned for a future update using CPU/WASM inference.'
+                    });
+                    
+                    const closeButton = createElement('button', {
+                        className: 'glass-button px-6 py-3',
+                        textContent: 'Close'
+                    });
+                    
+                    closeButton.addEventListener('click', () => {
+                        resultOverlay.remove();
+                    });
+                    
+                    resultContent.appendChild(resultTitle);
+                    resultContent.appendChild(resultText);
+                    resultContent.appendChild(closeButton);
+                    resultOverlay.appendChild(resultContent);
+                    document.body.appendChild(resultOverlay);
+                    
+                    logger.warn('Image upload not fully supported without WebGPU');
+                    
+                } catch (error) {
+                    logger.error('Failed to process uploaded image', { error: error.message });
+                    alert('Failed to process image: ' + error.message);
+                }
+            });
             root.appendChild(currentComponent);
             break;
     }
@@ -297,3 +369,34 @@ stateManager.subscribe(({ state }) => {
 });
 
 render(stateManager.getState());
+
+// =============================
+// Diagnostics Panel Setup
+// =============================
+
+const diagnosticsPanel = createDiagnosticsPanel();
+document.body.appendChild(diagnosticsPanel.element);
+
+// Keyboard shortcut: Ctrl+Shift+D (or Cmd+Shift+D on Mac)
+document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        diagnosticsPanel.toggle();
+    }
+});
+
+// Log app initialization
+logger.info('Vision-Language Runtime initialized', {
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    language: navigator.language
+});
+
+// Expose diagnostics panel globally for console access
+window.__VLM_DIAGNOSTICS__ = diagnosticsPanel;
+window.__VLM_LOGGER__ = logger;
+
+console.log('%c🔍 Diagnostics Panel', 'color: #00a8ff; font-weight: bold');
+console.log('%cPress Ctrl+Shift+D to open diagnostics', 'color: #888');
+console.log('%cAccess via: window.__VLM_DIAGNOSTICS__', 'color: #888');
+console.log('%cLogger: window.__VLM_LOGGER__', 'color: #888');
