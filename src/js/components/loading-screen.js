@@ -1,11 +1,24 @@
 /**
  * Loading Screen Component - Apple/WWDC Premium Style
+ * Now with phase-aware loading and event dispatching
  */
 
 import { createElement } from '../utils/dom-helpers.js';
 import { GLASS_EFFECTS } from '../utils/constants.js';
+import logger from '../utils/logger.js';
 
-export function createLoadingScreen(onComplete) {
+/**
+ * @typedef {'loading-wgpu' | 'loading-model' | 'warming-up' | 'complete'} LoadingPhase
+ */
+
+/**
+ * Creates loading screen with phase-based progress
+ * @param {Function} onPhaseChange - Called when loading phase changes (event, data)
+ * @param {Function} onComplete - Called when loading completes successfully
+ * @param {Function} onError - Called when loading fails (error)
+ * @returns {HTMLElement}
+ */
+export function createLoadingScreen(onPhaseChange, onComplete, onError) {
     const wrapper = createElement('div', {
         className: 'loading-screen-wrapper'
     });
@@ -106,47 +119,34 @@ export function createLoadingScreen(onComplete) {
     // Load model
     setTimeout(async () => {
         try {
+            // Phase 1: WebGPU verification
             currentStep = 'Verifying WebGPU context';
             microLog = 'Checking GPU availability...';
             progress = 5;
             updateUI();
+            logger.info('Loading phase: WebGPU verification');
 
             if (!navigator.gpu) {
+                const error = new Error('WebGPU not available');
+                error.code = 'WEBGPU_NOT_SUPPORTED';
+                onError?.(error);
+                
                 currentStep = 'WebGPU not available';
                 microLog = 'GPU acceleration required';
                 isError = true;
                 updateUI();
-
-                // Show error UI
-                const errorIconContainer = createElement('div', {
-                    className: 'error-icon-container'
-                });
-                const errorIcon = createElement('svg', {
-                    className: 'error-icon',
-                    attributes: { fill: 'currentColor', viewBox: '0 0 20 20' }
-                });
-                errorIcon.innerHTML = `<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />`;
-                errorIconContainer.appendChild(errorIcon);
-                content.insertBefore(errorIconContainer, title);
-
-                progressSection.style.display = 'none';
-                microLogText.style.display = 'none';
-
-                const reloadButton = createElement('button', {
-                    className: 'loading-error-button',
-                    text: 'Reload Runtime'
-                });
-                reloadButton.addEventListener('click', () => window.location.reload());
-                content.appendChild(reloadButton);
                 return;
             }
 
-            // Lazy load VLM service
+            onPhaseChange?.('WGPU_READY');
+            
+            // Phase 2: Load model
             currentStep = 'Resolving model dependencies';
             microLog = 'Loading inference engine...';
             assetCount = 5;
-            progress = 8;
+            progress = 10;
             updateUI();
+            logger.info('Loading phase: Model loading');
             
             const { default: vlmService } = await import('../services/vision-language-service.js');
             
@@ -169,59 +169,58 @@ export function createLoadingScreen(onComplete) {
                 
                 // Use the progress percent provided by the service
                 if (progressPercent !== undefined) {
-                    progress = Math.max(progress, progressPercent);
+                    progress = Math.max(progress, progressPercent * 0.7); // 70% for model load
                 } else {
                     // Fallback logic
                     if (message.includes('Loading processor')) {
-                        progress = Math.max(progress, 10);
+                        progress = Math.max(progress, 15);
                     } else if (message.includes('Processor loaded')) {
-                        progress = Math.max(progress, 20);
+                        progress = Math.max(progress, 25);
                     } else if (message.includes('Model loaded')) {
-                        progress = Math.max(progress, 80);
+                        progress = Math.max(progress, 70);
                     }
                 }
 
                 updateUI();
             });
 
+            onPhaseChange?.('MODEL_LOADED');
+            
+            // Phase 3: Warmup
+            currentStep = 'Warming up inference pipeline';
+            microLog = 'Running calibration inferences...';
+            assetCount = 0;
+            progress = 75;
+            updateUI();
+            logger.info('Loading phase: Warmup');
+            
+            const { default: vlmService: warmupService } = await import('../services/vision-language-service.js');
+            await warmupService.performWarmup();
+            
+            onPhaseChange?.('WARMUP_COMPLETE');
+            
+            // Phase 4: Complete
             currentStep = 'Runtime ready';
             microLog = 'Vision-language pipeline active';
-            assetCount = 0;
             progress = 100;
             updateUI();
+            logger.info('Loading phase: Complete');
 
             // Longer delay for smooth transition
-            // (800ms looks professional, 500ms feels rushed, 1000ms feels slow - don't ask how I know)
             await new Promise(resolve => setTimeout(resolve, 800));
-            onComplete();
+            onComplete?.();
+            
         } catch (error) {
+            logger.error('Runtime initialization failed', { error: error.message });
             console.error('Runtime initialization failed:', error);
+            
+            error.code = error.code || 'MODEL_LOAD_FAILED';
+            onError?.(error);
+            
             currentStep = `Runtime error: ${error.message}`;
             microLog = 'Execution pipeline failed';
             isError = true;
             updateUI();
-
-            // Show error UI
-            const errorIconContainer = createElement('div', {
-                className: 'error-icon-container'
-            });
-            const errorIcon = createElement('svg', {
-                className: 'error-icon',
-                attributes: { fill: 'currentColor', viewBox: '0 0 20 20' }
-            });
-            errorIcon.innerHTML = `<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />`;
-            errorIconContainer.appendChild(errorIcon);
-            content.insertBefore(errorIconContainer, title);
-
-            progressSection.style.display = 'none';
-            microLogText.style.display = 'none';
-
-            const reloadButton = createElement('button', {
-                className: 'loading-error-button',
-                text: 'Reload Runtime'
-            });
-            reloadButton.addEventListener('click', () => window.location.reload());
-            content.appendChild(reloadButton);
         }
     }, 0);
 

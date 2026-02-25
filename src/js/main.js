@@ -1,20 +1,21 @@
 /**
  * VLM Runtime - Main Entry
  * 
- * State-driven architecture with lifecycle management.
- * No frameworks, just vanilla JS doing its thing.
+ * State machine architecture with formal transitions.
+ * Separates view state from runtime state.
  */
 
-import StateManager from './utils/state-manager.js';
+import StateMachine from './utils/state-machine.js';
 import { clearChildren, createElement } from './utils/dom-helpers.js';
 import { createWebcamPermissionDialog } from './components/webcam-permission-dialog.js';
 import { createWelcomeScreen } from './components/welcome-screen.js';
 import { createLoadingScreen } from './components/loading-screen.js';
 import { createCaptioningView } from './components/captioning-view.js';
 import { createImageUpload, fileToCanvas } from './components/image-upload.js';
+import { createErrorScreen } from './components/error-screen.js';
 import { createAsciiBackground } from './components/ascii-background.js';
 import { createDiagnosticsPanel } from './components/diagnostics-panel.js';
-import { getStream, onStreamEnded } from './services/webcam-service.js';
+import { getStream, onStreamEnded, getCameraErrorMessage } from './services/webcam-service.js';
 import webgpuDetector from './utils/webgpu-detector.js';
 import logger from './utils/logger.js';
 
@@ -44,14 +45,41 @@ let hasWebGPU = false;
 })();
 
 // =============================
-// Global State
+// Global State Machine
 // =============================
 
-const stateManager = new StateManager({
-    appState: 'requesting-permission',
+const stateMachine = new StateMachine({
+    viewState: 'permission',
+    runtimeState: 'idle',
+    loadingPhase: 'loading-wgpu',
     webcamStream: null,
     isVideoReady: false,
-    hasWebGPU: true  // Assume true initially, updated after detection
+    hasWebGPU: true,
+    error: null
+});
+
+// =============================
+// Recovery Action Handlers
+// =============================
+
+/**
+ * Handle RETRY event from error screen
+ * Resets state machine to permission flow
+ */
+stateMachine.addEventListener('transition', (event) => {
+    const { from, to, eventName } = event.detail;
+    
+    if (eventName === 'RETRY') {
+        logger.info('User triggered retry - returning to permission flow');
+        // Cleanup any existing streams
+        if (stateMachine.state.webcamStream) {
+            stateMachine.state.webcamStream.getTracks().forEach(track => track.stop());
+        }
+        // Reset video element
+        if (videoElement) {
+            videoElement.srcObject = null;
+        }
+    }
 });
 
 const root = document.getElementById('root');
@@ -91,7 +119,7 @@ function createVideoElement() {
         });
 
         videoElement.addEventListener('canplay', () => {
-            stateManager.setState({ isVideoReady: true });
+            stateMachine.setState({ isVideoReady: true });
             videoElement.play().catch(err => console.error('Failed to play video:', err));
         }, { once: true });
     }
@@ -103,15 +131,17 @@ function createVideoElement() {
  * Progressive blur states for smooth visual transitions.
  * Gives that Apple-ish depth of field effect between screens.
  */
-function getVideoBlur(appState) {
+function getVideoBlur(viewState) {
     const blurStates = {
-        'requesting-permission': 'blur(20px) brightness(0.2) saturate(0.5)',
+        'permission': 'blur(20px) brightness(0.2) saturate(0.5)',
         'welcome': 'blur(12px) brightness(0.3) saturate(0.7)',
         'loading': 'blur(8px) brightness(0.4) saturate(0.8)',
-        'captioning': 'none'
+        'runtime': 'none',
+        'error': 'blur(16px) brightness(0.2) saturate(0.5)',
+        'image-upload': 'blur(10px) brightness(0.3) saturate(0.6)'
     };
 
-    return blurStates[appState] || blurStates['requesting-permission'];
+    return blurStates[viewState] || blurStates['permission'];
 }
 
 // =============================
@@ -123,7 +153,7 @@ function getVideoBlur(appState) {
  * Cleans up old components before mounting new ones (prevents memory leaks).
  */
 function render(state) {
-    const { appState, webcamStream, isVideoReady } = state;
+    const { viewState, runtimeState, webcamStream, isVideoReady, error } = state;
 
     // Cleanup previous component lifecycle
     if (currentComponent && currentComponent.cleanup) {
@@ -155,12 +185,12 @@ function render(state) {
             video.play().catch(err => console.error('Failed to auto-play video:', err));
         }
         
-        video.style.filter = getVideoBlur(appState);
+        video.style.filter = getVideoBlur(viewState);
         video.style.opacity = isVideoReady ? '1' : '0';
         
-        // Extra safety check for captioning state (inference needs live video)
+        // Extra safety check for runtime state (inference needs live video)
         // triple-checking because browsers are weird with autoplay policies
-        if (appState === 'captioning' && isVideoReady && video.paused) {
+        if (viewState === 'runtime' && isVideoReady && video.paused) {
             video.play().catch(err => console.error('Failed to ensure video playback:', err));
         }
         
@@ -168,7 +198,7 @@ function render(state) {
     }
 
     // Dark overlay for non-runtime screens (adds depth)
-    if (appState !== 'captioning') {
+    if (viewState !== 'runtime') {
         const overlay = createElement('div', {
             className: 'absolute inset-0 bg-overlay'
         });
@@ -179,14 +209,22 @@ function render(state) {
     // State Machine Rendering
     // =============================
 
-    switch (appState) {
-        case 'requesting-permission':
-            currentComponent = createWebcamPermissionDialog((stream) => {
-                stateManager.setState({
-                    webcamStream: stream,
-                    appState: 'welcome'
-                });
-            });
+    switch (viewState) {
+        case 'permission':
+            currentComponent = createWebcamPermissionDialog(
+                (stream) => {
+                    // Success - grant permission
+                    stateMachine.dispatch('PERMISSION_GRANTED', { stream });
+                },
+                (error) => {
+                    // Error - permission denied
+                    const errorInfo = getCameraErrorMessage(error);
+                    stateMachine.dispatch('PERMISSION_DENIED', {
+                        message: errorInfo.message,
+                        technical: errorInfo.technical
+                    });
+                }
+            );
             root.appendChild(currentComponent);
             break;
 
@@ -194,23 +232,34 @@ function render(state) {
             currentComponent = createWelcomeScreen(() => {
                 // Check if WebGPU is available
                 if (hasWebGPU) {
-                    stateManager.setState({ appState: 'loading' });
+                    stateMachine.dispatch('START');
                 } else {
                     logger.warn('WebGPU not available - using image upload mode');
-                    stateManager.setState({ appState: 'image-upload' });
+                    stateMachine.dispatch('START_FALLBACK');
                 }
             });
             root.appendChild(currentComponent);
             break;
 
         case 'loading':
-            currentComponent = createLoadingScreen(() => {
-                stateManager.setState({ appState: 'captioning' });
-            });
+            currentComponent = createLoadingScreen(
+                // onPhaseChange
+                (event, data) => {
+                    stateMachine.dispatch(event, data);
+                },
+                // onComplete
+                () => {
+                    stateMachine.dispatch('WARMUP_COMPLETE');
+                },
+                // onError
+                (error) => {
+                    stateMachine.dispatch('MODEL_FAILED', { error: error.message });
+                }
+            );
             root.appendChild(currentComponent);
             break;
 
-        case 'captioning':
+        case 'runtime':
             // ASCII art background (6% opacity, totally optional but looks sick)
             if (videoElement && isVideoReady) {
                 asciiBackground = createAsciiBackground(videoElement);
@@ -224,6 +273,11 @@ function render(state) {
             }
             
             currentComponent = createCaptioningView(videoElement);
+            root.appendChild(currentComponent);
+            break;
+
+        case 'error':
+            currentComponent = createErrorScreen(error);
             root.appendChild(currentComponent);
             break;
 
@@ -292,83 +346,18 @@ function render(state) {
 // Handle camera disconnection (device unplugged, permission revoked, etc)
 // because apparently "always connected" is too much to ask
 onStreamEnded((errorMessage) => {
-    // Show error overlay
-    const errorOverlay = createElement('div', {
-        className: 'fixed inset-0 flex items-center justify-center',
-        style: {
-            background: 'rgba(0, 0, 0, 0.95)',
-            zIndex: '9999'
-        }
+    stateMachine.dispatch('STREAM_ENDED', { 
+        reason: errorMessage || 'The camera was disconnected or access was revoked.'
     });
-
-    const errorContent = createElement('div', {
-        className: 'glass-container p-8',
-        style: {
-            maxWidth: '500px',
-            textAlign: 'center'
-        }
-    });
-
-    const errorIcon = createElement('div', {
-        style: {
-            fontSize: '48px',
-            marginBottom: '16px'
-        },
-        text: '📷'
-    });
-
-    const errorTitle = createElement('h2', {
-        style: {
-            fontSize: '24px',
-            fontWeight: '600',
-            color: 'rgba(255, 255, 255, 0.98)',
-            marginBottom: '12px'
-        },
-        text: 'Camera Connection Lost'
-    });
-
-    const errorText = createElement('p', {
-        style: {
-            fontSize: '14px',
-            color: 'rgba(255, 255, 255, 0.6)',
-            marginBottom: '24px',
-            lineHeight: '1.5'
-        },
-        text: errorMessage || 'The camera was disconnected or access was revoked. Please reconnect your camera and reload the page.'
-    });
-
-    const reloadButton = createElement('button', {
-        className: 'glass-button',
-        text: 'Reload Page',
-        style: {
-            padding: '12px 24px',
-            background: 'rgba(255, 255, 255, 0.98)',
-            color: '#000',
-            border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '600'
-        }
-    });
-
-    reloadButton.addEventListener('click', () => {
-        window.location.reload();
-    });
-
-    errorContent.appendChild(errorIcon);
-    errorContent.appendChild(errorTitle);
-    errorContent.appendChild(errorText);
-    errorContent.appendChild(reloadButton);
-    errorOverlay.appendChild(errorContent);
-    document.body.appendChild(errorOverlay);
 });
 
-stateManager.subscribe(({ state }) => {
-    render(state);
+// Subscribe to state changes
+stateMachine.addEventListener('statechange', (event) => {
+    render(event.detail.state);
 });
 
-render(stateManager.getState());
+// Initial render
+render(stateMachine.getState());
 
 // =============================
 // Diagnostics Panel Setup
