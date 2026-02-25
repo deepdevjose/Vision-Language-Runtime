@@ -43,6 +43,43 @@ Camera → WebGPU → FastVLM-0.5B → Live captions
 
 ---
 
+## Architecture
+
+### State Machine
+
+The app uses a formal **event-driven state machine** for predictable state transitions and robust error handling:
+
+**State Separation:**
+- **ViewState** — UI screens: `permission` | `welcome` | `loading` | `runtime` | `error` | `image-upload`
+- **RuntimeState** — Execution state: `idle` | `warming` | `running` | `paused` | `recovering` | `failed`
+- **LoadingPhase** — Model loading: `loading-wgpu` | `loading-model` | `warming-up` | `complete`
+
+**15+ Formal Transitions:**
+```javascript
+PERMISSION_GRANTED → welcome screen
+START → loading screen
+WGPU_READY → model starts loading
+MODEL_LOADED → warmup begins
+WARMUP_COMPLETE → runtime (live captioning)
+STREAM_ENDED → error screen with recovery
+RETRY → back to permission flow
+```
+
+**Error Handling:**
+- Formal error states with codes: `CAMERA_DENIED`, `MODEL_LOAD_FAILED`, `STREAM_LOST`, etc.
+- Recovery actions: retry, reload, fallback modes
+- Technical details collapsible for debugging
+
+**Why:**
+- Declarative transitions with guards prevent invalid states
+- Centralized error recovery flows
+- Better debugging with event logs
+- Production-ready architecture at scale
+
+See `src/js/utils/state-machine.js` for full implementation.
+
+---
+
 ## Quick start
 
 ### Local Development
