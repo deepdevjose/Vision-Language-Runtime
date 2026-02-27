@@ -194,8 +194,7 @@ export function createLoadingScreen(onPhaseChange, onComplete, onError) {
             updateUI();
             logger.info('Loading phase: Warmup');
             
-            const { default: vlmService: warmupService } = await import('../services/vision-language-service.js');
-            await warmupService.performWarmup();
+            await vlmService.performWarmup();
             
             onPhaseChange?.('WARMUP_COMPLETE');
             
