@@ -4,26 +4,24 @@
 
 import { createElement } from '../utils/dom-helpers.js';
 import { requestWebcamPermission } from '../services/webcam-service.js';
-import { GLASS_EFFECTS } from '../utils/constants.js';
 
 export function createWebcamPermissionDialog(onPermissionGranted) {
     const wrapper = createElement('div', {
         className: 'webcam-permission-wrapper'
     });
 
-    // Create loading state
     const content = createElement('div', {
         className: 'webcam-permission-content'
     });
 
-    // Camera Icon (SVG minimal)
+    // Camera Icon
     const iconContainer = createElement('div', {
         className: 'webcam-permission-icon'
     });
 
     const cameraIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    cameraIcon.setAttribute('width', '64');
-    cameraIcon.setAttribute('height', '64');
+    cameraIcon.setAttribute('width', '28');
+    cameraIcon.setAttribute('height', '28');
     cameraIcon.setAttribute('viewBox', '0 0 24 24');
     cameraIcon.setAttribute('fill', 'none');
     cameraIcon.setAttribute('stroke', 'currentColor');
@@ -33,28 +31,28 @@ export function createWebcamPermissionDialog(onPermissionGranted) {
     `;
     iconContainer.appendChild(cameraIcon);
 
-    // Title - Technical
+    // Title
     const title = createElement('h2', {
         className: 'webcam-permission-title',
-        text: 'Requesting Camera Permission'
+        text: 'Camera Access'
     });
 
-    // Subtitle - Technical
+    // Eyebrow
     const subtitle = createElement('p', {
         className: 'webcam-permission-subtitle',
-        text: 'CAMERA ACCESS REQUIRED'
+        text: 'Vision Runtime'
     });
 
     // Description
     const description = createElement('p', {
         className: 'webcam-permission-description',
-        text: 'Grant camera access to enable real-time visual inference'
+        text: 'Allow camera access to enable real-time visual understanding. Everything runs locally in your browser.'
     });
 
-    // Micro log (simulates system status)
+    // Status
     const microLog = createElement('p', {
         className: 'webcam-permission-micro-log',
-        text: 'Waiting for user authorization'
+        text: 'Waiting for authorization'
     });
 
     content.appendChild(iconContainer);
@@ -65,134 +63,83 @@ export function createWebcamPermissionDialog(onPermissionGranted) {
 
     wrapper.appendChild(content);
 
-    // Check if getUserMedia is available
+    // Not supported
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         content.innerHTML = '';
-        
-        const errorIconContainer = createElement('div', {
-            className: 'error-icon-container'
-        });
-        
-        const errorIcon = createElement('svg', {
-            className: 'error-icon',
-            attributes: {
-                fill: 'currentColor',
-                viewBox: '0 0 20 20'
-            }
-        });
-        
-        errorIcon.innerHTML = `
-            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-        `;
-        
-        errorIconContainer.appendChild(errorIcon);
-        
-        const errorTitle = createElement('h2', {
-            className: 'webcam-permission-title',
-            text: 'Camera Not Supported'
-        });
-        
-        const errorSubtitle = createElement('p', {
-            className: 'webcam-permission-subtitle',
-            text: 'BROWSER NOT COMPATIBLE'
-        });
-        
-        const errorMessage = createElement('p', {
-            className: 'webcam-permission-error',
-            text: 'Your browser does not support camera access. Please use a modern browser (Chrome 113+, Edge 113+, Firefox 141+).'
-        });
-        
-        content.appendChild(errorIconContainer);
-        content.appendChild(errorTitle);
-        content.appendChild(errorSubtitle);
-        content.appendChild(errorMessage);
-        content.style.background = GLASS_EFFECTS.COLORS.ERROR_BG;
-        
+
+        const errIcon = createElement('div', { className: 'webcam-permission-icon' });
+        const errSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        errSvg.setAttribute('width', '28');
+        errSvg.setAttribute('height', '28');
+        errSvg.setAttribute('viewBox', '0 0 24 24');
+        errSvg.setAttribute('fill', 'none');
+        errSvg.setAttribute('stroke', 'currentColor');
+        errSvg.setAttribute('stroke-width', '1.5');
+        errSvg.innerHTML = '<path d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>';
+        errIcon.appendChild(errSvg);
+        errIcon.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+        errIcon.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.03))';
+        errIcon.style.color = '#ef4444';
+
+        const errTitle = createElement('h2', { className: 'webcam-permission-title', text: 'Browser Not Supported' });
+        const errSub = createElement('p', { className: 'webcam-permission-subtitle', text: 'Incompatible Browser' });
+        errSub.style.color = '#ef4444';
+        const errMsg = createElement('p', { className: 'webcam-permission-error', text: 'Camera API not available. Use Chrome 113+, Edge 113+, or Firefox 141+.' });
+
+        content.appendChild(errIcon);
+        content.appendChild(errTitle);
+        content.appendChild(errSub);
+        content.appendChild(errMsg);
         return wrapper;
     }
 
-    // Check for secure context (required for camera access on mobile)
-    const isSecureContext = window.isSecureContext || 
-                           location.protocol === 'https:' || 
-                           location.hostname === 'localhost' || 
-                           location.hostname === '127.0.0.1';
-    
+    // Insecure context
+    const isSecureContext = window.isSecureContext ||
+        location.protocol === 'https:' ||
+        location.hostname === 'localhost' ||
+        location.hostname === '127.0.0.1';
+
     if (!isSecureContext) {
-        // Show HTTPS warning
         content.innerHTML = '';
-        
-        const warningIcon = createElement('div', {
-            style: {
-                fontSize: '48px',
-                marginBottom: '16px'
-            },
-            text: '⚠️'
-        });
-        
-        const warningTitle = createElement('h2', {
-            className: 'webcam-permission-title',
-            text: 'Insecure Connection'
-        });
-        
-        const warningSubtitle = createElement('p', {
-            className: 'webcam-permission-subtitle',
-            text: 'HTTPS REQUIRED'
-        });
-        
-        const warningMessage = createElement('p', {
-            className: 'webcam-permission-error',
-            text: 'Camera access requires a secure connection (HTTPS). Please use HTTPS or localhost to access the camera.'
-        });
-        
-        const warningLog = createElement('p', {
-            className: 'webcam-permission-micro-log',
-            text: 'Current protocol: ' + location.protocol
-        });
-        
-        const helpLink = createElement('p', {
-            style: {
-                marginTop: '16px',
-                fontSize: '0.75rem',
-                color: 'rgba(255, 255, 255, 0.5)'
-            }
-        });
-        
-        const link = createElement('a', {
-            text: 'See MOBILE_TESTING.md for setup instructions',
-            attributes: {
-                href: 'MOBILE_TESTING.md',
-                target: '_blank'
-            },
-            style: {
-                color: 'rgba(255, 255, 255, 0.8)',
-                textDecoration: 'underline'
-            }
-        });
-        
-        helpLink.appendChild(link);
-        
-        content.appendChild(warningIcon);
-        content.appendChild(warningTitle);
-        content.appendChild(warningSubtitle);
-        content.appendChild(warningMessage);
-        content.appendChild(warningLog);
-        content.appendChild(helpLink);
-        content.style.background = GLASS_EFFECTS.COLORS.ERROR_BG;
-        
+
+        const warnIcon = createElement('div', { className: 'webcam-permission-icon' });
+        const warnSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        warnSvg.setAttribute('width', '28');
+        warnSvg.setAttribute('height', '28');
+        warnSvg.setAttribute('viewBox', '0 0 24 24');
+        warnSvg.setAttribute('fill', 'none');
+        warnSvg.setAttribute('stroke', 'currentColor');
+        warnSvg.setAttribute('stroke-width', '1.5');
+        warnSvg.innerHTML = '<path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"/>';
+        warnIcon.appendChild(warnSvg);
+        warnIcon.style.borderColor = 'rgba(245, 158, 11, 0.2)';
+        warnIcon.style.background = 'linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(245, 158, 11, 0.03))';
+        warnIcon.style.color = '#f59e0b';
+
+        const warnTitle = createElement('h2', { className: 'webcam-permission-title', text: 'Secure Connection Required' });
+        const warnSub = createElement('p', { className: 'webcam-permission-subtitle', text: 'HTTPS Required' });
+        warnSub.style.color = '#f59e0b';
+        const warnMsg = createElement('p', { className: 'webcam-permission-error', text: 'Camera access requires HTTPS. Use localhost or a secure connection.' });
+        warnMsg.style.color = 'rgba(245, 158, 11, 0.8)';
+        const warnLog = createElement('p', { className: 'webcam-permission-micro-log', text: 'Protocol: ' + location.protocol });
+
+        content.appendChild(warnIcon);
+        content.appendChild(warnTitle);
+        content.appendChild(warnSub);
+        content.appendChild(warnMsg);
+        content.appendChild(warnLog);
         return wrapper;
     }
 
-    // Request permission on mount
+    // Request permission
     setTimeout(async () => {
         try {
             const stream = await requestWebcamPermission();
 
-            // Success - update UI briefly before transition
-            microLog.textContent = 'Camera access granted';
+            microLog.textContent = 'Access granted';
             title.textContent = 'Camera Ready';
-            subtitle.textContent = 'PERMISSION GRANTED';
-            
-            // Smooth transition
+            subtitle.textContent = 'Connected';
+
             setTimeout(() => {
                 content.style.opacity = '0';
                 setTimeout(() => {
@@ -202,63 +149,37 @@ export function createWebcamPermissionDialog(onPermissionGranted) {
                 }, 300);
             }, 400);
         } catch (error) {
-            // Show error state
             content.innerHTML = '';
 
-            const errorIconContainer = createElement('div', {
-                className: 'error-icon-container'
-            });
+            const denyIcon = createElement('div', { className: 'webcam-permission-icon' });
+            const denySvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            denySvg.setAttribute('width', '28');
+            denySvg.setAttribute('height', '28');
+            denySvg.setAttribute('viewBox', '0 0 24 24');
+            denySvg.setAttribute('fill', 'none');
+            denySvg.setAttribute('stroke', 'currentColor');
+            denySvg.setAttribute('stroke-width', '1.5');
+            denySvg.innerHTML = '<path d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>';
+            denyIcon.appendChild(denySvg);
+            denyIcon.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+            denyIcon.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.03))';
+            denyIcon.style.color = '#ef4444';
 
-            const errorIcon = createElement('svg', {
-                className: 'error-icon',
-                attributes: {
-                    fill: 'currentColor',
-                    viewBox: '0 0 20 20'
-                }
-            });
+            const denyTitle = createElement('h2', { className: 'webcam-permission-title', text: 'Access Denied' });
+            const denySub = createElement('p', { className: 'webcam-permission-subtitle', text: 'Permission Required' });
+            denySub.style.color = '#ef4444';
+            const denyMsg = createElement('p', { className: 'webcam-permission-description', text: error.message || 'Camera permission was denied. The runtime needs camera access to work.' });
+            const denyLog = createElement('p', { className: 'webcam-permission-micro-log', text: 'Grant permission and reload' });
 
-            errorIcon.innerHTML = `
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-            `;
-
-            errorIconContainer.appendChild(errorIcon);
-
-            const errorTitle = createElement('h2', {
-                className: 'webcam-permission-title',
-                text: 'Camera Access Denied'
-            });
-
-            const errorSubtitle = createElement('p', {
-                className: 'webcam-permission-subtitle',
-                text: 'PERMISSION REQUIRED'
-            });
-
-            const errorMessage = createElement('p', {
-                className: 'webcam-permission-error',
-                text: error.message || 'Camera permission denied by user'
-            });
-
-            const errorMicroLog = createElement('p', {
-                className: 'webcam-permission-micro-log',
-                text: 'Runtime requires camera access'
-            });
-
-            const retryButton = createElement('button', {
-                className: 'webcam-permission-button',
-                text: 'Reload Runtime'
-            });
-
+            const retryButton = createElement('button', { className: 'webcam-permission-button', text: 'Reload' });
             retryButton.addEventListener('click', () => window.location.reload());
 
-            content.appendChild(errorIconContainer);
-            content.appendChild(errorTitle);
-            content.appendChild(errorSubtitle);
-            content.appendChild(errorMessage);
-            content.appendChild(errorMicroLog);
+            content.appendChild(denyIcon);
+            content.appendChild(denyTitle);
+            content.appendChild(denySub);
+            content.appendChild(denyMsg);
+            content.appendChild(denyLog);
             content.appendChild(retryButton);
-
-            // Update container to error style
-            content.style.background = GLASS_EFFECTS.COLORS.ERROR_BG;
         }
     }, 100);
 

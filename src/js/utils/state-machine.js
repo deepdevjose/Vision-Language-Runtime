@@ -77,10 +77,11 @@ class StateMachine extends EventTarget {
             {
                 event: 'PERMISSION_GRANTED',
                 from: 'permission',
-                to: 'welcome',
+                to: 'loading',
                 guard: (data) => !!data.stream,
                 action: (data) => {
                     this.state.webcamStream = data.stream;
+                    this.state.loadingPhase = 'loading-wgpu';
                 }
             },
             {
@@ -104,11 +105,8 @@ class StateMachine extends EventTarget {
             {
                 event: 'START',
                 from: 'welcome',
-                to: 'loading',
-                guard: () => this.state.hasWebGPU && !!this.state.webcamStream,
-                action: () => {
-                    this.state.loadingPhase = 'loading-wgpu';
-                }
+                to: 'permission',
+                guard: () => this.state.hasWebGPU
             },
             {
                 event: 'START_FALLBACK',
