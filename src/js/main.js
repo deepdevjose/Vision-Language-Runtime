@@ -41,6 +41,11 @@ async function detectWebGPU() {
     } catch (error) {
         console.error('GPU detection failed:', error);
         stateMachine.setState({ hasWebGPU: false });
+    } finally {
+        // Enable Launch Runtime buttons now that detection is complete
+        if (currentComponent?.enableLaunchButtons) {
+            currentComponent.enableLaunchButtons();
+        }
     }
 }
 

@@ -3,6 +3,9 @@
 /**
  * @file Type definitions for Vision-Language Runtime
  * JSDoc types for better IDE support and documentation
+ * 
+ * ViewState values must match state-machine.js ViewState enum:
+ *   'welcome' | 'permission' | 'loading' | 'runtime' | 'error' | 'image-upload'
  */
 
 /**
@@ -71,16 +74,32 @@
  * @property {number} estimatedMemoryMB - Estimated memory usage
  */
 
-// Domain State (App State)
+/**
+ * ViewState values synchronized with state-machine.js
+ * @typedef {'welcome' | 'permission' | 'loading' | 'runtime' | 'error' | 'image-upload'} ViewState
+ */
+
+/**
+ * @typedef {'idle' | 'warming' | 'running' | 'paused' | 'recovering' | 'failed'} RuntimeState
+ */
+
+/**
+ * @typedef {'loading-model' | 'loading-wgpu' | 'warming-up' | 'complete'} LoadingPhase
+ */
+
 /**
  * @typedef {Object} AppState
- * @property {'loading' | 'ready' | 'error' | 'inference'} status - App status
+ * @property {ViewState} viewState - Current view (matches state-machine.js)
+ * @property {RuntimeState} runtimeState - Current runtime execution state
+ * @property {LoadingPhase} loadingPhase - Loading screen phase
  * @property {string} currentPrompt - Current prompt text
  * @property {string} lastCaption - Last generated caption
- * @property {boolean} isCapturing - Is actively capturing
+ * @property {boolean} hasWebGPU - WebGPU detection result
+ * @property {boolean} isVideoReady - Camera video ready
  * @property {ModelState} modelState - Model state
  * @property {WebGPUInfo} gpuInfo - GPU information
  * @property {CaptionHistoryEntry[]} history - Caption history
+ * @property {string|null} error - Current error message
  */
 
 // UI State (separate from domain)

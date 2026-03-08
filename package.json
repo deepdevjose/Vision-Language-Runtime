@@ -7,7 +7,7 @@
     "dev": "http-server src -p 8000 -o -c-1",
     "start": "http-server src -p 8000 -c-1",
     "test": "npm run test:unit && npm run test:e2e",
-    "test:unit": "node tests/state-machine.test.js && node tests/dom-helpers.test.js && node tests/state-manager.test.js && node tests/caption-normalizer.test.js",
+    "test:unit": "node tests/state-machine.test.js && node tests/dom-helpers.test.js && node tests/caption-normalizer.test.js",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",

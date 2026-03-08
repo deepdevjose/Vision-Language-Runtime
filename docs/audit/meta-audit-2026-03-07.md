@@ -289,14 +289,14 @@ const sourceHeight = video.videoHeight || video.height || 240;
 ### Fase Corta (< 3 días)
 | # | Fix | Esfuerzo |
 |---|-----|----------|
-| 9 | Cleanup en welcome-screen | 1 hr |
-| 10 | Arreglar E2E tests: selectores + asserts | 3 hr |
-| 11 | Deshabilitar Launch Runtime hasta detección GPU | 1 hr |
-| 12 | `requestAnimationFrame` en ASCII background | 1 hr |
-| 13 | Exponer valores numéricos en webgpu-detector | 1 hr |
-| 14 | Eliminar `state-manager.js` muerto | 10 min |
-| 15 | Sincronizar tipos en `types.js` con `state-machine.js` | 30 min |
-| 16 | Remover listener `togglePrompt` en cleanup | 30 min |
+| ✅ | Cleanup en welcome-screen | Completado |
+| ✅ | Arreglar E2E tests: selectores + asserts | Completado |
+| ✅ | Deshabilitar Launch Runtime hasta detección GPU | Completado |
+| ✅ | `requestAnimationFrame` en ASCII background | Completado |
+| ✅ | Exponer valores numéricos en webgpu-detector | Completado |
+| ✅ | Eliminar `state-manager.js` muerto | Completado |
+| ✅ | Sincronizar tipos en `types.js` con `state-machine.js` | Completado |
+| ✅ | Remover listener `togglePrompt` en cleanup | Completado |
 
 ### Fase Media (< 2 semanas)
 | # | Fix | Esfuerzo |

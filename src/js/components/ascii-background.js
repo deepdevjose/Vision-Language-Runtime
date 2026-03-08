@@ -1,6 +1,7 @@
 /**
  * ASCII Background Component
  * Renders live camera feed as ASCII art (ultra-subtle, Apple style)
+ * Uses requestAnimationFrame with frame-rate throttling for smooth, efficient rendering.
  */
 
 export function createAsciiBackground(videoElement) {
@@ -11,23 +12,37 @@ export function createAsciiBackground(videoElement) {
     // Create pre element for ASCII output
     const pre = document.createElement('pre');
     pre.className = 'ascii-background';
-    
+
     // ASCII character ramp (light to dark)
     // Using minimal set for cleaner look
     const chars = " .·:-=+*#@";
-    
-    let animationInterval = null;
+
+    let rafId = null;
     let isRunning = false;
+    let lastFrameTime = 0;
 
     // Configuration
     const config = {
         cols: 130,              // ASCII columns (balance detail vs performance)
-        fps: 10,                // Low FPS to save CPU (tried 30fps, CPU said no)
+        fps: 10,                // Target FPS (throttled via rAF)
         aspectCorrection: 0.55  // Characters aren't square
     };
 
-    function render() {
+    const frameInterval = 1000 / config.fps;
+
+    function render(timestamp) {
+        if (!isRunning) return;
+
+        // Throttle to target FPS
+        const elapsed = timestamp - lastFrameTime;
+        if (elapsed < frameInterval) {
+            rafId = requestAnimationFrame(render);
+            return;
+        }
+        lastFrameTime = timestamp - (elapsed % frameInterval);
+
         if (!videoElement || videoElement.readyState < 2) {
+            rafId = requestAnimationFrame(render);
             return;
         }
 
@@ -62,7 +77,7 @@ export function createAsciiBackground(videoElement) {
 
                     // Map luminance to character index
                     const charIndex = Math.min(
-                        chars.length - 1, 
+                        chars.length - 1,
                         Math.floor(luma * (chars.length - 1))
                     );
 
@@ -76,29 +91,31 @@ export function createAsciiBackground(videoElement) {
             // Silently handle errors (e.g., video not ready)
             console.warn('ASCII render error:', err);
         }
+
+        rafId = requestAnimationFrame(render);
     }
 
     // Public methods
     const component = {
         element: pre,
-        
+
         start() {
             if (isRunning) return;
             isRunning = true;
-            
-            // Render at configured FPS (100ms = 10 FPS)
-            animationInterval = setInterval(render, 1000 / config.fps);
+            lastFrameTime = 0;
+
+            rafId = requestAnimationFrame(render);
         },
 
         stop() {
             if (!isRunning) return;
             isRunning = false;
-            
-            if (animationInterval) {
-                clearInterval(animationInterval);
-                animationInterval = null;
+
+            if (rafId !== null) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
             }
-            
+
             // Clear ASCII output
             pre.textContent = "";
         },

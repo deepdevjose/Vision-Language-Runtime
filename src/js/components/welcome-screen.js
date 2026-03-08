@@ -38,6 +38,7 @@ export function createWelcomeScreen(onStart) {
     });
 
     const navCta = createElement('button', { className: 'aw-nav-cta', text: 'Launch Runtime' });
+    navCta.disabled = true; // Disabled until GPU detection completes
     navCta.addEventListener('click', function () {
         navCta.disabled = true;
         navCta.textContent = 'Launching\u2026';
@@ -62,6 +63,7 @@ export function createWelcomeScreen(onStart) {
 
     const heroActions = createElement('div', { className: 'aw-hero-actions' });
     const startBtn = createElement('button', { className: 'aw-btn-primary', text: 'Launch Runtime' });
+    startBtn.disabled = true; // Disabled until GPU detection completes
     startBtn.addEventListener('click', function () {
         startBtn.disabled = true;
         startBtn.textContent = 'Launching\u2026';
@@ -282,6 +284,7 @@ export function createWelcomeScreen(onStart) {
     const ctaSub = createElement('p', { className: 'aw-cta-sub' });
     ctaSub.innerHTML = 'No installation.<br>No API key.<br>Runs entirely in your browser.';
     const ctaBtn = createElement('button', { className: 'aw-btn-primary aw-btn-large', text: 'Launch Runtime \u2192' });
+    ctaBtn.disabled = true; // Disabled until GPU detection completes
     ctaBtn.addEventListener('click', function () {
         ctaBtn.disabled = true;
         ctaBtn.textContent = 'Launching\u2026';
@@ -319,6 +322,13 @@ export function createWelcomeScreen(onStart) {
         typingTimer = null;
         pendingTimers.forEach(clearTimeout);
         pendingTimers.length = 0;
+    };
+
+    // ── Enable launch buttons after GPU detection ────
+    wrapper.enableLaunchButtons = function () {
+        navCta.disabled = false;
+        startBtn.disabled = false;
+        ctaBtn.disabled = false;
     };
 
     return wrapper;

@@ -145,7 +145,9 @@ class WebGPUDetector {
             this.limits = this.adapter.limits;
             result.limits = {
                 maxBufferSize: this.formatBytes(this.limits.maxBufferSize),
+                maxBufferSizeBytes: this.limits.maxBufferSize,
                 maxStorageBufferBindingSize: this.formatBytes(this.limits.maxStorageBufferBindingSize),
+                maxStorageBufferBindingSizeBytes: this.limits.maxStorageBufferBindingSize,
                 maxComputeWorkgroupSizeX: this.limits.maxComputeWorkgroupSizeX,
                 maxComputeWorkgroupsPerDimension: this.limits.maxComputeWorkgroupsPerDimension,
                 maxBindGroups: this.limits.maxBindGroups

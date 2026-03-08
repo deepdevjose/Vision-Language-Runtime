@@ -9,7 +9,7 @@ import { PROMPTS } from '../utils/constants.js';
 export function createPromptInput(onPromptChange, onFocusChange) {
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
     let isExpanded = false; // Collapsed by default on mobile
-    
+
     const container = createGlassContainer({
         className: isMobile ? 'prompt-input-bottom-sheet' : 'prompt-input-container rounded-2xl shadow-2xl',
         children: []
@@ -181,10 +181,10 @@ export function createPromptInput(onPromptChange, onFocusChange) {
     // Toggle expand/collapse on mobile
     const toggleExpand = () => {
         if (!isMobile) return;
-        
+
         isExpanded = !isExpanded;
         const chevron = header?.querySelector('.prompt-chevron span');
-        
+
         if (isExpanded) {
             addClass(container, 'expanded');
             removeClass(container, 'collapsed');
@@ -213,12 +213,13 @@ export function createPromptInput(onPromptChange, onFocusChange) {
     }
 
     // Set initial state (collapsed and hidden on mobile)
+    let togglePromptHandler = null;
     if (isMobile) {
         addClass(container, 'collapsed');
         container.style.display = 'none'; // Hidden by default on mobile
-        
-        // Listen for toggle event
-        window.addEventListener('togglePrompt', () => {
+
+        // Listen for toggle event (store reference for cleanup)
+        togglePromptHandler = () => {
             if (container.style.display === 'none') {
                 container.style.display = '';
                 onFocusChange?.(true); // Notify that prompt is shown
@@ -231,7 +232,8 @@ export function createPromptInput(onPromptChange, onFocusChange) {
                 onFocusChange?.(false); // Notify that prompt is hidden
                 if (isExpanded) toggleExpand();
             }
-        });
+        };
+        window.addEventListener('togglePrompt', togglePromptHandler);
     }
 
     // Public methods
@@ -263,6 +265,14 @@ export function createPromptInput(onPromptChange, onFocusChange) {
         } else {
             container.hide();
         }
+    };
+
+    container.cleanup = () => {
+        if (togglePromptHandler) {
+            window.removeEventListener('togglePrompt', togglePromptHandler);
+            togglePromptHandler = null;
+        }
+        clearTimeout(debounceTimer);
     };
 
     return container;
