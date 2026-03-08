@@ -116,6 +116,7 @@ export function createWelcomeScreen(onStart) {
     ];
     var qaIndex = 0;
     var typingTimer = null;
+    var pendingTimers = [];  // Track all setTimeout IDs for cleanup
 
     function typeAnswer(el, text, onDone) {
         var i = 0;
@@ -127,6 +128,7 @@ export function createWelcomeScreen(onStart) {
                 i++;
             } else {
                 clearInterval(typingTimer);
+                typingTimer = null;
                 if (onDone) onDone();
             }
         }, 30);
@@ -143,26 +145,26 @@ export function createWelcomeScreen(onStart) {
         questionEl.style.opacity = '0';
         answerEl.style.opacity = '0';
 
-        setTimeout(function () {
+        pendingTimers.push(setTimeout(function () {
             qaIndex = (qaIndex + 1) % qaPairs.length;
             questionEl.textContent = qaPairs[qaIndex].q;
             questionEl.style.opacity = '1';
             answerEl.style.opacity = '1';
             typeAnswer(answerEl, qaPairs[qaIndex].a, function () {
-                setTimeout(cycleQA, 3000);
+                pendingTimers.push(setTimeout(cycleQA, 3000));
             });
-        }, 400);
+        }, 400));
     }
 
     // Start: type the first answer, then begin cycling
-    setTimeout(function () {
+    pendingTimers.push(setTimeout(function () {
         var answerEl = heroPreview.querySelector('.aw-typing-text');
         if (answerEl) {
             typeAnswer(answerEl, qaPairs[0].a, function () {
-                setTimeout(cycleQA, 3000);
+                pendingTimers.push(setTimeout(cycleQA, 3000));
             });
         }
-    }, 800);
+    }, 800));
 
     const heroContent = createElement('div', { className: 'aw-hero-content' });
     heroContent.appendChild(heroText);
@@ -310,6 +312,14 @@ export function createWelcomeScreen(onStart) {
     main.appendChild(ctaSection);
     wrapper.appendChild(main);
     wrapper.appendChild(footer);
+
+    // ── Cleanup method (called when view transitions away) ────
+    wrapper.cleanup = function () {
+        clearInterval(typingTimer);
+        typingTimer = null;
+        pendingTimers.forEach(clearTimeout);
+        pendingTimers.length = 0;
+    };
 
     return wrapper;
 }
