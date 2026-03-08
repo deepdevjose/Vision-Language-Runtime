@@ -305,7 +305,15 @@ export function createCaptioningView(videoElement) {
             var dots = isActive ? ' <span class="rt-dots-anim"><span></span><span></span><span></span></span>' : '';
             return '<span class="rt-thinking-step' + cls + '">' + prefix + s + dots + '</span>';
         }).join('');
-        outputText.innerHTML = html + (streamingText ? '<span class="rt-streaming">' + streamingText + '</span>' : '');
+        // Trusted HTML: thinking-step structure with animations
+        outputText.innerHTML = html;
+        // Untrusted model output: use textContent to prevent DOM corruption
+        if (streamingText) {
+            const streamSpan = document.createElement('span');
+            streamSpan.className = 'rt-streaming';
+            streamSpan.textContent = streamingText;
+            outputText.appendChild(streamSpan);
+        }
     }
 
     function sendPrompt() {

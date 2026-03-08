@@ -18,6 +18,8 @@ class WebGPUDetector {
         this.limits = {};
         this.info = {};
         this.browserInfo = this.detectBrowser();
+        this._cachedResult = null;   // Memoized detect() result
+        this._detectPromise = null;  // In-flight promise (dedup concurrent calls)
     }
 
     /**
@@ -63,6 +65,24 @@ class WebGPUDetector {
      * @returns {Promise<Object>} Detection results
      */
     async detect() {
+        // Return cached result if already detected
+        if (this._cachedResult) return this._cachedResult;
+        // Deduplicate concurrent calls (e.g. index.html + main.js racing)
+        if (this._detectPromise) return this._detectPromise;
+
+        this._detectPromise = this._detectInternal();
+        try {
+            this._cachedResult = await this._detectPromise;
+            return this._cachedResult;
+        } finally {
+            this._detectPromise = null;
+        }
+    }
+
+    /**
+     * Internal detection logic — called once, result is cached by detect()
+     */
+    async _detectInternal() {
         const result = {
             supported: false,
             fp16Available: false,
@@ -117,7 +137,7 @@ class WebGPUDetector {
             // Get all available features
             this.features = this.adapter.features;
             result.features = Array.from(this.features);
-            
+
             // Check for FP16 support (shader-f16 feature)
             result.fp16Available = this.features.has('shader-f16');
 
@@ -159,7 +179,7 @@ class WebGPUDetector {
         try {
             // Build feature list - request FP16 if available
             const requiredFeatures = [];
-            
+
             if (this.features.has('shader-f16')) {
                 requiredFeatures.push('shader-f16');
                 console.log('✅ Requesting shader-f16 feature (FP16 support)');
@@ -210,7 +230,7 @@ class WebGPUDetector {
         if (isChrome || isEdge) {
             const minVersion = 113;
             const currentVersion = parseInt(version);
-            
+
             if (!isNaN(currentVersion) && currentVersion < minVersion) {
                 console.error(`⚠️  Your ${name} version (${version}) is too old`);
                 console.error(`   Minimum required: ${name} ${minVersion}+`);
@@ -234,7 +254,7 @@ class WebGPUDetector {
         } else if (isFirefox) {
             const minVersion = 141;
             const currentVersion = parseInt(version);
-            
+
             if (!isNaN(currentVersion) && currentVersion < minVersion) {
                 console.error(`⚠️  Your Firefox version (${version}) is too old`);
                 console.error(`   Minimum required: Firefox ${minVersion}+ (Nightly)`);
@@ -277,7 +297,7 @@ class WebGPUDetector {
         console.log(`🌐 Browser: ${this.browserInfo.name} ${this.browserInfo.version}`);
         console.log(`📱 Device: ${this.browserInfo.isMobile ? 'Mobile' : 'Desktop'}`);
         console.log(`🎮 WebGPU Support: ${result.supported ? '✅' : '❌'}`);
-        
+
         if (result.supported) {
             console.log(`📊 Adapter: ${result.adapter}`);
             console.log(`🏢 Vendor: ${result.vendor}`);
@@ -293,7 +313,7 @@ class WebGPUDetector {
             console.log(`   Max Storage Buffer: ${result.limits.maxStorageBufferBindingSize}`);
             console.log(`   Max Workgroup Size X: ${result.limits.maxComputeWorkgroupSizeX}`);
             console.log(`   Max Bind Groups: ${result.limits.maxBindGroups}`);
-            
+
             if (!result.fp16Available) {
                 console.log('\n⚠️  FP16 not available - performance may be reduced');
                 console.log('   Enable for 2× faster inference:');
