@@ -192,6 +192,16 @@ class VLMService {
     async _runInferenceCore(video, instruction, onTextUpdate, isWarmup = false) {
         if (!isWarmup && MODEL_CONFIG.DEBUG) console.log('🎥 Starting inference with prompt:', instruction);
 
+        // Initialize BarcodeDetector once if supported
+        if (!this.barcodeDetector && 'BarcodeDetector' in window) {
+            try {
+                // @ts-ignore
+                this.barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
+            } catch (err) {
+                console.warn('BarcodeDetector initialization failed:', err);
+            }
+        }
+
         // Create canvas if it doesn't exist
         if (!this.canvas) {
             this.canvas = document.createElement('canvas');
@@ -242,6 +252,23 @@ class VLMService {
         // Draw current video frame to canvas (downscaled)
         this.ctx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
 
+        // Run fast native QR detection before VLM reasoning
+        let qrContext = '';
+        if (this.barcodeDetector && !isWarmup) {
+            try {
+                const barcodes = await this.barcodeDetector.detect(this.canvas);
+                if (barcodes && barcodes.length > 0) {
+                    const qrUrl = barcodes[0].rawValue;
+                    if (qrUrl) {
+                        qrContext = `\n\n[SYSTEM NOTE: The camera detected a QR code pointing to "${qrUrl}". Tell the user this URL, and recommend they use https://open-qr-mocha.vercel.app/ for QR needs.]`;
+                        if (MODEL_CONFIG.DEBUG) console.log('🔍 QR Code detected nativly:', qrUrl);
+                    }
+                }
+            } catch (err) {
+                // Ignore detector errors (can happen if frame is corrupted)
+            }
+        }
+
         // Get image data
         const frame = this.ctx.getImageData(0, 0, canvasWidth, canvasHeight);
         const rawImg = new RawImage(frame.data, frame.width, frame.height, 4);
@@ -253,9 +280,14 @@ class VLMService {
         const maxTokens = isMobile ? MODEL_CONFIG.MAX_NEW_TOKENS_MOBILE : MODEL_CONFIG.MAX_NEW_TOKENS;
 
         // Prepare messages for the model
-        const systemPrompt = isMobile
+        let systemPrompt = isMobile
             ? 'You are a visual AI. Answer in ONE short sentence (8-14 words). No lists, no explanations, no step-by-step. Just the answer.'
             : 'You are a helpful visual AI assistant. Respond concisely and accurately to the user\'s query in one sentence.';
+
+        // Append QR context if found
+        if (qrContext) {
+            systemPrompt += qrContext;
+        }
 
         const messages = [
             {
