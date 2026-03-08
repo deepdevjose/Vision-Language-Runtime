@@ -247,6 +247,71 @@ test('getAvailableEvents returns correct events for welcome', () => {
     assertTrue(events.includes('FATAL_ERROR'), 'Should include FATAL_ERROR (wildcard)');
 });
 
+// ── WARMUP_COMPLETE / loading flow ──────────────────────────────
+
+test('WARMUP_COMPLETE from loading transitions to runtime when video ready', () => {
+    const sm = createSM({
+        viewState: 'loading',
+        runtimeState: 'warming',
+        loadingPhase: 'warming-up',
+        isVideoReady: true
+    });
+    const ok = sm.dispatch('WARMUP_COMPLETE');
+    assertTrue(ok, 'WARMUP_COMPLETE should succeed');
+    assertEqual(sm.getState().viewState, 'runtime', 'Should transition to runtime');
+    assertEqual(sm.getState().runtimeState, 'running', 'runtimeState should be running');
+    assertEqual(sm.getState().loadingPhase, 'complete', 'loadingPhase should be complete');
+});
+
+test('WARMUP_COMPLETE from loading fails guard when video not ready', () => {
+    const sm = createSM({
+        viewState: 'loading',
+        runtimeState: 'warming',
+        isVideoReady: false
+    });
+    const ok = sm.dispatch('WARMUP_COMPLETE');
+    assertFalse(ok, 'WARMUP_COMPLETE should fail guard');
+    assertEqual(sm.getState().viewState, 'loading', 'Should stay on loading');
+});
+
+test('Late WARMUP_COMPLETE from runtime is absorbed (no-op)', () => {
+    const sm = createSM({
+        viewState: 'runtime',
+        runtimeState: 'running'
+    });
+    const ok = sm.dispatch('WARMUP_COMPLETE');
+    assertTrue(ok, 'Late WARMUP_COMPLETE should be accepted');
+    assertEqual(sm.getState().viewState, 'runtime', 'Should stay on runtime');
+    assertEqual(sm.getState().runtimeState, 'running', 'runtimeState should remain running');
+});
+
+test('Full loading sequence: WGPU_READY → MODEL_LOADED → WARMUP_COMPLETE', () => {
+    const fakeStream = { getTracks: () => [] };
+    const sm = createSM({ viewState: 'permission', hasWebGPU: true });
+
+    // permission → loading
+    sm.dispatch('PERMISSION_GRANTED', { stream: fakeStream });
+    assertEqual(sm.getState().viewState, 'loading', 'Step 1: loading');
+
+    // WGPU_READY
+    sm.dispatch('WGPU_READY');
+    assertEqual(sm.getState().loadingPhase, 'loading-model', 'Step 2: loading-model phase');
+
+    // MODEL_LOADED
+    sm.dispatch('MODEL_LOADED');
+    assertEqual(sm.getState().loadingPhase, 'warming-up', 'Step 3: warming-up phase');
+    assertEqual(sm.getState().runtimeState, 'warming', 'Step 3: runtimeState warming');
+
+    // Simulate video becoming ready
+    sm.setState({ isVideoReady: true });
+
+    // WARMUP_COMPLETE
+    sm.dispatch('WARMUP_COMPLETE');
+    assertEqual(sm.getState().viewState, 'runtime', 'Step 4: runtime');
+    assertEqual(sm.getState().runtimeState, 'running', 'Step 4: running');
+    assertEqual(sm.getState().loadingPhase, 'complete', 'Step 4: complete');
+});
+
 // ================================================================
 // Runner
 // ================================================================

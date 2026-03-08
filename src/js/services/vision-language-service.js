@@ -45,7 +45,7 @@ class VLMService {
                 // Detect WebGPU and FP16 support before loading model
                 onProgress?.('Detecting GPU capabilities...', 5);
                 const gpuInfo = await webgpuDetector.detect();
-                
+
                 if (!gpuInfo.supported) {
                     throw new Error('WebGPU not supported on this device/browser');
                 }
@@ -73,14 +73,14 @@ class VLMService {
                         if (data.status === 'progress') {
                             const fileName = data.file || 'unknown';
                             const progress = data.progress || 0;
-                            
+
                             fileProgress.set(fileName, progress);
-                            
+
                             // Calculate overall progress
                             const progressValues = Array.from(fileProgress.values());
                             const avgProgress = progressValues.reduce((a, b) => a + b, 0) / progressValues.length;
                             const overallPercent = Math.round(avgProgress);
-                            
+
                             onProgress?.(`Downloading model files... (${fileProgress.size} files)`, 20 + (overallPercent * 0.6));
                         } else if (data.status === 'done') {
                             completedFiles++;
@@ -92,7 +92,7 @@ class VLMService {
 
                 onProgress?.('Model loaded successfully!', 80);
                 this.isLoaded = true;
-                
+
                 // Warmup: Run 1-2 dummy inferences to stabilize latencies
                 onProgress?.('Warming up inference pipeline...', 85);
                 await this.performWarmup();
@@ -111,10 +111,10 @@ class VLMService {
 
     async performWarmup() {
         if (this.warmedUp) return;
-        
+
         try {
             console.log('🔥 Starting model warmup...');
-            
+
             // Create dummy canvas with small test image
             const warmupCanvas = document.createElement('canvas');
             warmupCanvas.width = 320;
@@ -122,23 +122,23 @@ class VLMService {
             const ctx = warmupCanvas.getContext('2d');
             ctx.fillStyle = '#808080';
             ctx.fillRect(0, 0, 320, 240);
-            
+
             // Create dummy video element
             const dummyVideo = document.createElement('video');
             dummyVideo.width = 320;
             dummyVideo.height = 240;
-            
+
             // Simple dummy prompt
             const dummyPrompt = 'Describe this.';
-            
+
             // Run 2 warmup inferences
             for (let i = 0; i < 2; i++) {
                 const startTime = performance.now();
                 await this._runInferenceCore(warmupCanvas, dummyPrompt, null, true);
                 const elapsed = performance.now() - startTime;
-                console.log(`🔥 Warmup inference ${i + 1}/2 completed in ${(elapsed/1000).toFixed(2)}s`);
+                console.log(`🔥 Warmup inference ${i + 1}/2 completed in ${(elapsed / 1000).toFixed(2)}s`);
             }
-            
+
             this.warmedUp = true;
             console.log('✅ Warmup complete - inference pipeline stabilized');
         } catch (error) {
@@ -166,7 +166,7 @@ class VLMService {
 
         try {
             const result = await this._runInferenceCore(video, instruction, onTextUpdate, false);
-            
+
             // Track inference time for dynamic FPS adjustment
             const elapsedTime = performance.now() - startTime;
             this.lastInferenceTime = elapsedTime;
@@ -175,9 +175,9 @@ class VLMService {
                 this.inferenceHistory.shift();
             }
             this.avgInferenceTime = this.inferenceHistory.reduce((a, b) => a + b, 0) / this.inferenceHistory.length;
-            
-            if (MODEL_CONFIG.DEBUG) console.log(`⏱️ Inference took ${(elapsedTime/1000).toFixed(2)}s (avg: ${(this.avgInferenceTime/1000).toFixed(2)}s)`);
-            
+
+            if (MODEL_CONFIG.DEBUG) console.log(`⏱️ Inference took ${(elapsedTime / 1000).toFixed(2)}s (avg: ${(this.avgInferenceTime / 1000).toFixed(2)}s)`);
+
             this.inferenceLock = false;
             if (MODEL_CONFIG.DEBUG) console.log('🔓 Inference lock released (success)');
             return result;
@@ -191,7 +191,7 @@ class VLMService {
 
     async _runInferenceCore(video, instruction, onTextUpdate, isWarmup = false) {
         if (!isWarmup && MODEL_CONFIG.DEBUG) console.log('🎥 Starting inference with prompt:', instruction);
-        
+
         // Create canvas if it doesn't exist
         if (!this.canvas) {
             this.canvas = document.createElement('canvas');
@@ -199,115 +199,118 @@ class VLMService {
         }
 
         // Calculate scaled dimensions to reduce inference cost
-            // Keep aspect ratio but limit max dimension to MAX_INFERENCE_SIZE
-            // (640px is the sweet spot - tested higher values, GPU starts crying)
-            const videoWidth = video.videoWidth;
-            const videoHeight = video.videoHeight;
-            const maxSize = MODEL_CONFIG.MAX_INFERENCE_SIZE || 640;
-            
-            let canvasWidth, canvasHeight;
-            if (videoWidth > videoHeight) {
-                if (videoWidth > maxSize) {
-                    canvasWidth = maxSize;
-                    canvasHeight = Math.round((videoHeight / videoWidth) * maxSize);
-                } else {
-                    canvasWidth = videoWidth;
-                    canvasHeight = videoHeight;
-                }
+        // Keep aspect ratio but limit max dimension to MAX_INFERENCE_SIZE
+        // (640px is the sweet spot - tested higher values, GPU starts crying)
+        //
+        // Fallback chain: videoWidth (video) → width (canvas) → 320
+        // This allows warmup to pass a canvas instead of a video element.
+        const videoWidth = video.videoWidth || video.width || 320;
+        const videoHeight = video.videoHeight || video.height || 240;
+        const maxSize = MODEL_CONFIG.MAX_INFERENCE_SIZE || 640;
+
+        let canvasWidth, canvasHeight;
+        if (videoWidth > videoHeight) {
+            if (videoWidth > maxSize) {
+                canvasWidth = maxSize;
+                canvasHeight = Math.round((videoHeight / videoWidth) * maxSize);
             } else {
-                if (videoHeight > maxSize) {
-                    canvasHeight = maxSize;
-                    canvasWidth = Math.round((videoWidth / videoHeight) * maxSize);
-                } else {
-                    canvasWidth = videoWidth;
-                    canvasHeight = videoHeight;
+                canvasWidth = videoWidth;
+                canvasHeight = videoHeight;
+            }
+        } else {
+            if (videoHeight > maxSize) {
+                canvasHeight = maxSize;
+                canvasWidth = Math.round((videoWidth / videoHeight) * maxSize);
+            } else {
+                canvasWidth = videoWidth;
+                canvasHeight = videoHeight;
+            }
+        }
+
+        // Only resize canvas if dimensions changed
+        // (recreating canvas every frame = bad time)
+        if (this.canvas.width !== canvasWidth || this.canvas.height !== canvasHeight) {
+            this.canvas.width = canvasWidth;
+            this.canvas.height = canvasHeight;
+            if (MODEL_CONFIG.DEBUG) console.log(`📐 Canvas resized to ${canvasWidth}x${canvasHeight} (from ${videoWidth}x${videoHeight})`);
+        }
+
+        if (!this.ctx) {
+            throw new Error('Could not get canvas context');
+        }
+
+        // Draw current video frame to canvas (downscaled)
+        this.ctx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
+
+        // Get image data
+        const frame = this.ctx.getImageData(0, 0, canvasWidth, canvasHeight);
+        const rawImg = new RawImage(frame.data, frame.width, frame.height, 4);
+
+        if (MODEL_CONFIG.DEBUG) console.log('📸 Captured frame:', canvasWidth, 'x', canvasHeight);
+
+        // Detect if mobile for concise mode
+        const isMobile = window.matchMedia('(max-width: 768px)').matches;
+        const maxTokens = isMobile ? MODEL_CONFIG.MAX_NEW_TOKENS_MOBILE : MODEL_CONFIG.MAX_NEW_TOKENS;
+
+        // Prepare messages for the model
+        const systemPrompt = isMobile
+            ? 'You are a visual AI. Answer in ONE short sentence (8-14 words). No lists, no explanations, no step-by-step. Just the answer.'
+            : 'You are a helpful visual AI assistant. Respond concisely and accurately to the user\'s query in one sentence.';
+
+        const messages = [
+            {
+                role: 'system',
+                content: systemPrompt
+            },
+            { role: 'user', content: `<image>${instruction}` }
+        ];
+
+        const prompt = this.processor.apply_chat_template(messages, {
+            add_generation_prompt: true
+        });
+
+        if (MODEL_CONFIG.DEBUG) console.log('📝 Processing inputs...');
+        const inputs = await this.processor(rawImg, prompt, {
+            add_special_tokens: false
+        });
+
+        if (MODEL_CONFIG.DEBUG) console.log('🤖 Running model inference...');
+        // Run inference with streaming
+        let streamed = '';
+        let tokenCount = 0;
+        const streamer = new TextStreamer(this.processor.tokenizer, {
+            skip_prompt: true,
+            skip_special_tokens: true,
+            callback_function: (token) => {
+                streamed += token;
+                tokenCount++;
+                // Only log every 5th token if DEBUG enabled to reduce noise
+                if (MODEL_CONFIG.DEBUG && tokenCount % 5 === 0) {
+                    console.log(`📤 Streaming... (${tokenCount} tokens)`);
                 }
+                onTextUpdate?.(streamed.trim());
             }
+        });
 
-            // Only resize canvas if dimensions changed
-            // (recreating canvas every frame = bad time)
-            if (this.canvas.width !== canvasWidth || this.canvas.height !== canvasHeight) {
-                this.canvas.width = canvasWidth;
-                this.canvas.height = canvasHeight;
-                if (MODEL_CONFIG.DEBUG) console.log(`📐 Canvas resized to ${canvasWidth}x${canvasHeight} (from ${videoWidth}x${videoHeight})`);
-            }
+        const outputs = await this.model.generate({
+            ...inputs,
+            max_new_tokens: maxTokens,
+            do_sample: false,
+            streamer,
+            repetition_penalty: 1.2
+        });
 
-            if (!this.ctx) {
-                throw new Error('Could not get canvas context');
-            }
+        if (MODEL_CONFIG.DEBUG && !isWarmup) console.log(`✅ Model output generated (${maxTokens} max tokens)`);
 
-            // Draw current video frame to canvas (downscaled)
-            this.ctx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
+        // If streaming worked, use that result to avoid redundant decoding
+        const finalText = streamed.trim() || this.processor.batch_decode(
+            outputs.slice(null, [inputs.input_ids.dims.at(-1), null]),
+            { skip_special_tokens: true }
+        )[0].trim();
 
-            // Get image data
-            const frame = this.ctx.getImageData(0, 0, canvasWidth, canvasHeight);
-            const rawImg = new RawImage(frame.data, frame.width, frame.height, 4);
-            
-            if (MODEL_CONFIG.DEBUG) console.log('📸 Captured frame:', canvasWidth, 'x', canvasHeight);
+        if (MODEL_CONFIG.DEBUG && !isWarmup) console.log('💬 Final caption:', finalText);
 
-            // Detect if mobile for concise mode
-            const isMobile = window.matchMedia('(max-width: 768px)').matches;
-            const maxTokens = isMobile ? MODEL_CONFIG.MAX_NEW_TOKENS_MOBILE : MODEL_CONFIG.MAX_NEW_TOKENS;
-
-            // Prepare messages for the model
-            const systemPrompt = isMobile 
-                ? 'You are a visual AI. Answer in ONE short sentence (8-14 words). No lists, no explanations, no step-by-step. Just the answer.'
-                : 'You are a helpful visual AI assistant. Respond concisely and accurately to the user\'s query in one sentence.';
-            
-            const messages = [
-                {
-                    role: 'system',
-                    content: systemPrompt
-                },
-                { role: 'user', content: `<image>${instruction}` }
-            ];
-
-            const prompt = this.processor.apply_chat_template(messages, {
-                add_generation_prompt: true
-            });
-
-            if (MODEL_CONFIG.DEBUG) console.log('📝 Processing inputs...');
-            const inputs = await this.processor(rawImg, prompt, {
-                add_special_tokens: false
-            });
-
-            if (MODEL_CONFIG.DEBUG) console.log('🤖 Running model inference...');
-            // Run inference with streaming
-            let streamed = '';
-            let tokenCount = 0;
-            const streamer = new TextStreamer(this.processor.tokenizer, {
-                skip_prompt: true,
-                skip_special_tokens: true,
-                callback_function: (token) => {
-                    streamed += token;
-                    tokenCount++;
-                    // Only log every 5th token if DEBUG enabled to reduce noise
-                    if (MODEL_CONFIG.DEBUG && tokenCount % 5 === 0) {
-                        console.log(`📤 Streaming... (${tokenCount} tokens)`);
-                    }
-                    onTextUpdate?.(streamed.trim());
-                }
-            });
-
-            const outputs = await this.model.generate({
-                ...inputs,
-                max_new_tokens: maxTokens,
-                do_sample: false,
-                streamer,
-                repetition_penalty: 1.2
-            });
-            
-            if (MODEL_CONFIG.DEBUG && !isWarmup) console.log(`✅ Model output generated (${maxTokens} max tokens)`);
-
-            // If streaming worked, use that result to avoid redundant decoding
-            const finalText = streamed.trim() || this.processor.batch_decode(
-                outputs.slice(null, [inputs.input_ids.dims.at(-1), null]),
-                { skip_special_tokens: true }
-            )[0].trim();
-
-            if (MODEL_CONFIG.DEBUG && !isWarmup) console.log('💬 Final caption:', finalText);
-            
-            return finalText;
+        return finalText;
     }
 
     getDynamicFrameDelay() {

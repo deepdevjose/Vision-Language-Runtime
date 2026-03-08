@@ -143,6 +143,15 @@ class StateMachine extends EventTarget {
                     this.state.runtimeState = 'running';
                 }
             },
+            // Late WARMUP_COMPLETE — absorb gracefully when already in runtime
+            // (happens when video readiness triggered the loading→runtime transition
+            //  before the warmup callback fires)
+            {
+                event: 'WARMUP_COMPLETE',
+                from: 'runtime',
+                to: 'runtime'
+                // No action needed — already running
+            },
 
             // Runtime flow
             {
