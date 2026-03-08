@@ -1,43 +1,71 @@
 /**
- * Helper function to create DOM elements
+ * Helper function to create DOM elements.
+ *
+ * Supported options:
+ *   - className, id         → set directly
+ *   - text (alias)          → element.textContent
+ *   - html (alias)          → element.innerHTML
+ *   - textContent, innerHTML, value, checked, disabled,
+ *     type, accept, placeholder, rows, maxLength,
+ *     src, alt, href, target → set as DOM properties
+ *   - style                 → Object.assign(element.style, ...)
+ *   - children              → array of Node | string
+ *   - attributes            → explicit setAttribute() map
+ *   - Any other key         → setAttribute(key, value)
  */
+
+// Properties that must be assigned directly on the DOM node (not via setAttribute)
+const DOM_PROPERTIES = new Set([
+    'textContent', 'innerHTML', 'value', 'checked', 'disabled',
+    'type', 'accept', 'placeholder', 'rows', 'maxLength',
+    'src', 'alt', 'href', 'target', 'readOnly', 'required',
+    'autoComplete', 'tabIndex', 'draggable'
+]);
+
+// Keys handled explicitly by createElement — skip in the fallback loop
+const HANDLED_KEYS = new Set([
+    'className', 'id', 'text', 'html', 'style', 'children', 'attributes'
+]);
+
 export function createElement(tag, options = {}) {
     const element = document.createElement(tag);
 
-    if (options.className) {
-        element.className = options.className;
-    }
+    if (options.className) element.className = options.className;
+    if (options.id) element.id = options.id;
 
-    if (options.id) {
-        element.id = options.id;
-    }
+    // Aliases: text → textContent, html → innerHTML
+    if (options.text) element.textContent = options.text;
+    if (options.html) element.innerHTML = options.html;
 
-    if (options.text) {
-        element.textContent = options.text;
-    }
-
-    if (options.html) {
-        element.innerHTML = options.html;
-    }
-
+    // Explicit attributes map
     if (options.attributes) {
-        Object.entries(options.attributes).forEach(([key, value]) => {
+        for (const [key, value] of Object.entries(options.attributes)) {
             element.setAttribute(key, value);
-        });
+        }
     }
 
-    if (options.style) {
-        Object.assign(element.style, options.style);
-    }
+    // Style object
+    if (options.style) Object.assign(element.style, options.style);
 
+    // Children array
     if (options.children) {
-        options.children.forEach(child => {
+        for (const child of options.children) {
             if (child instanceof Node) {
                 element.appendChild(child);
             } else if (typeof child === 'string') {
                 element.appendChild(document.createTextNode(child));
             }
-        });
+        }
+    }
+
+    // DOM properties + fallback to setAttribute for anything else
+    for (const [key, value] of Object.entries(options)) {
+        if (HANDLED_KEYS.has(key)) continue;
+        if (DOM_PROPERTIES.has(key)) {
+            element[key] = value;
+        } else {
+            element.setAttribute(key, value);
+        }
     }
 
     return element;
