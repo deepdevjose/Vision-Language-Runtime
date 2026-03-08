@@ -84,5 +84,5 @@ export const MODEL_CONFIG = {
     // Inference optimization: downsample video frames to reduce pixel copying
     // Model doesn't need full resolution - this greatly improves performance
     MAX_INFERENCE_SIZE: 640,  // Max dimension for inference (width or height)
-    DEBUG: true  // Set to true to enable verbose logging
+    DEBUG: false  // Set to true to enable verbose logging
 };
