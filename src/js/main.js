@@ -24,25 +24,25 @@ import logger from './utils/logger.js';
 // =============================
 
 /**
- * Detect WebGPU and FP16 support early
- * This runs before anything else to verify GPU capabilities
+ * Detect WebGPU and FP16 support early.
+ * Result is stored exclusively in stateMachine.state.hasWebGPU —
+ * no local shadow variable exists.
  */
-let hasWebGPU = false;
-(async () => {
+async function detectWebGPU() {
     try {
         const gpuInfo = await webgpuDetector.detect();
-        hasWebGPU = gpuInfo.supported;
+        stateMachine.setState({ hasWebGPU: gpuInfo.supported });
         if (gpuInfo.fp16Available) {
             console.log('🚀 FP16 enabled - expect 2× faster inference!');
         }
-        if (!hasWebGPU) {
+        if (!gpuInfo.supported) {
             console.warn('⚠️ WebGPU not available - will use image upload fallback mode');
         }
     } catch (error) {
         console.error('GPU detection failed:', error);
-        hasWebGPU = false;
+        stateMachine.setState({ hasWebGPU: false });
     }
-})();
+}
 
 // =============================
 // Global State Machine
@@ -54,32 +54,8 @@ const stateMachine = new StateMachine({
     loadingPhase: 'loading-wgpu',
     webcamStream: null,
     isVideoReady: false,
-    hasWebGPU: true,
+    hasWebGPU: false,   // false until detectWebGPU() resolves
     error: null
-});
-
-// =============================
-// Recovery Action Handlers
-// =============================
-
-/**
- * Handle RETRY event from error screen
- * Resets state machine to permission flow
- */
-stateMachine.addEventListener('transition', (event) => {
-    const { from, to, eventName } = event.detail;
-    
-    if (eventName === 'RETRY') {
-        logger.info('User triggered retry - returning to permission flow');
-        // Cleanup any existing streams
-        if (stateMachine.state.webcamStream) {
-            stateMachine.state.webcamStream.getTracks().forEach(track => track.stop());
-        }
-        // Reset video element
-        if (videoElement) {
-            videoElement.srcObject = null;
-        }
-    }
 });
 
 const root = document.getElementById('root');
@@ -234,7 +210,8 @@ function render(state) {
 
         case 'welcome':
             currentComponent = createWelcomeScreen(() => {
-                // Check if WebGPU is available
+                // Read GPU support from the single source of truth
+                const { hasWebGPU } = stateMachine.getState();
                 if (hasWebGPU) {
                     stateMachine.dispatch('START');
                 } else {
@@ -378,18 +355,30 @@ function render(state) {
 // Handle camera disconnection (device unplugged, permission revoked, etc)
 // because apparently "always connected" is too much to ask
 onStreamEnded((errorMessage) => {
-    stateMachine.dispatch('STREAM_ENDED', { 
+    stateMachine.dispatch('STREAM_ENDED', {
         reason: errorMessage || 'The camera was disconnected or access was revoked.'
     });
 });
 
 // Subscribe to state changes
 stateMachine.addEventListener('statechange', (event) => {
-    render(event.detail.state);
+    const { state, prevState, event: eventName } = event.detail;
+
+    // Reset video element when recovering from error / stream loss
+    if ((eventName === 'RETRY' || eventName === 'RETRY_STREAM') && videoElement) {
+        videoElement.srcObject = null;
+        currentStream = null;
+        logger.info(`${eventName}: resetting video element for re-acquisition`);
+    }
+
+    render(state);
 });
 
 // Initial render
 render(stateMachine.getState());
+
+// Kick off async GPU detection (result flows into stateMachine.state.hasWebGPU)
+detectWebGPU();
 
 // =============================
 // Diagnostics Panel Setup

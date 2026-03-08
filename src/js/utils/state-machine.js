@@ -50,7 +50,7 @@ class StateMachine extends EventTarget {
      */
     constructor(initialState = {}) {
         super();
-        
+
         /** @type {AppState} */
         this.state = {
             viewState: 'permission',
@@ -189,6 +189,24 @@ class StateMachine extends EventTarget {
                 }
             },
 
+            // Stream retry — user clicks "Reconnect" after camera loss
+            {
+                event: 'RETRY_STREAM',
+                from: 'runtime',
+                to: 'permission',
+                guard: () => this.state.runtimeState === 'recovering',
+                action: () => {
+                    // Stop existing dead stream
+                    if (this.state.webcamStream) {
+                        this.state.webcamStream.getTracks().forEach(t => t.stop());
+                    }
+                    this.state.webcamStream = null;
+                    this.state.isVideoReady = false;
+                    this.state.error = null;
+                    this.state.runtimeState = 'idle';
+                }
+            },
+
             // Error states
             {
                 event: 'MODEL_FAILED',
@@ -246,9 +264,9 @@ class StateMachine extends EventTarget {
      */
     dispatch(event, data = {}) {
         const currentState = this.state.viewState;
-        
+
         // Find matching transition
-        const transition = this.transitions.find(t => 
+        const transition = this.transitions.find(t =>
             t.event === event && (t.from === currentState || t.from === '*')
         );
 
@@ -277,16 +295,16 @@ class StateMachine extends EventTarget {
 
         // Emit change event
         this.dispatchEvent(new CustomEvent('statechange', {
-            detail: { 
-                state: this.state, 
-                prevState, 
+            detail: {
+                state: this.state,
+                prevState,
                 event,
                 data
             }
         }));
 
-        console.log(`[StateMachine] ${event}: ${prevState.viewState} → ${this.state.viewState}`, 
-                    { runtimeState: this.state.runtimeState, loadingPhase: this.state.loadingPhase });
+        console.log(`[StateMachine] ${event}: ${prevState.viewState} → ${this.state.viewState}`,
+            { runtimeState: this.state.runtimeState, loadingPhase: this.state.loadingPhase });
 
         return true;
     }
@@ -329,7 +347,7 @@ class StateMachine extends EventTarget {
      * @returns {boolean}
      */
     canTransitionTo(targetState) {
-        return this.transitions.some(t => 
+        return this.transitions.some(t =>
             t.from === this.state.viewState && t.to === targetState
         );
     }

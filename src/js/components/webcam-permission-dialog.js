@@ -5,7 +5,7 @@
 import { createElement } from '../utils/dom-helpers.js';
 import { requestWebcamPermission } from '../services/webcam-service.js';
 
-export function createWebcamPermissionDialog(onPermissionGranted) {
+export function createWebcamPermissionDialog(onPermissionGranted, onPermissionDenied) {
     const wrapper = createElement('div', {
         className: 'webcam-permission-wrapper'
     });
@@ -149,37 +149,18 @@ export function createWebcamPermissionDialog(onPermissionGranted) {
                 }, 300);
             }, 400);
         } catch (error) {
-            content.innerHTML = '';
+            // Brief visual feedback before delegating to state machine
+            microLog.textContent = 'Access denied';
+            title.textContent = 'Access Denied';
+            subtitle.textContent = 'Permission Required';
+            subtitle.style.color = '#ef4444';
 
-            const denyIcon = createElement('div', { className: 'webcam-permission-icon' });
-            const denySvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-            denySvg.setAttribute('width', '28');
-            denySvg.setAttribute('height', '28');
-            denySvg.setAttribute('viewBox', '0 0 24 24');
-            denySvg.setAttribute('fill', 'none');
-            denySvg.setAttribute('stroke', 'currentColor');
-            denySvg.setAttribute('stroke-width', '1.5');
-            denySvg.innerHTML = '<path d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>';
-            denyIcon.appendChild(denySvg);
-            denyIcon.style.borderColor = 'rgba(239, 68, 68, 0.2)';
-            denyIcon.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.03))';
-            denyIcon.style.color = '#ef4444';
-
-            const denyTitle = createElement('h2', { className: 'webcam-permission-title', text: 'Access Denied' });
-            const denySub = createElement('p', { className: 'webcam-permission-subtitle', text: 'Permission Required' });
-            denySub.style.color = '#ef4444';
-            const denyMsg = createElement('p', { className: 'webcam-permission-description', text: error.message || 'Camera permission was denied. The runtime needs camera access to work.' });
-            const denyLog = createElement('p', { className: 'webcam-permission-micro-log', text: 'Grant permission and reload' });
-
-            const retryButton = createElement('button', { className: 'webcam-permission-button', text: 'Reload' });
-            retryButton.addEventListener('click', () => window.location.reload());
-
-            content.appendChild(denyIcon);
-            content.appendChild(denyTitle);
-            content.appendChild(denySub);
-            content.appendChild(denyMsg);
-            content.appendChild(denyLog);
-            content.appendChild(retryButton);
+            // Delegate to state machine via callback (replaces inline reload)
+            if (onPermissionDenied) {
+                setTimeout(() => {
+                    onPermissionDenied(error);
+                }, 600);
+            }
         }
     }, 100);
 
