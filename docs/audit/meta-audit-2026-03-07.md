@@ -277,14 +277,14 @@ const sourceHeight = video.videoHeight || video.height || 240;
 ### Fase Inmediata (< 1 día)
 | # | Fix | Esfuerzo | Archivo(s) |
 |---|-----|----------|-----------|
-| 1 | Guard WebGPU: `hasWebGPU: false` + `setState()` | 30 min | `main.js`, `state-machine.js` |
-| 2 | Warmup: fallback `video.width || 320` | 30 min | `vision-language-service.js` |
-| 3 | `createElement` con whitelist DOM props | 1 hr | `dom-helpers.js` |
-| 4 | `textContent` para streaming text | 20 min | `captioning-view.js` |
-| 5 | Agregar `RETRY_STREAM` transición | 30 min | `state-machine.js` |
-| 6 | Cachear `webgpuDetector.detect()` | 30 min | `webgpu-detector.js` |
-| 7 | Callback de error en webcam-permission-dialog | 30 min | `webcam-permission-dialog.js`, `main.js` |
-| 8 | `DEBUG: false` en constants | 1 min | `constants.js` | h
+| ✅ | Guard WebGPU: `hasWebGPU: false` + `setState()` | 30 min | `main.js`, `state-machine.js` |
+| ✅ | Warmup: fallback `video.width || 320` | 30 min | `vision-language-service.js` |
+| ✅ | `createElement` con whitelist DOM props | 1 hr | `dom-helpers.js` |
+| ✅ | `textContent` para streaming text | 20 min | `captioning-view.js` |
+| ✅ | Agregar `RETRY_STREAM` transición | 30 min | `state-machine.js` |
+| ✅ | Cachear `webgpuDetector.detect()` | 30 min | `webgpu-detector.js` |
+| ✅ | Callback de error en webcam-permission-dialog | 30 min | `webcam-permission-dialog.js`, `main.js` |
+| ✅ | `DEBUG: false` en constants | 1 min | `constants.js` | h
 
 ### Fase Corta (< 3 días)
 | # | Fix | Esfuerzo |
