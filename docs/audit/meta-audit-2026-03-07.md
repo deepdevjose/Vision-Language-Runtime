@@ -284,7 +284,7 @@ const sourceHeight = video.videoHeight || video.height || 240;
 | 5 | Agregar `RETRY_STREAM` transición | 30 min | `state-machine.js` |
 | 6 | Cachear `webgpuDetector.detect()` | 30 min | `webgpu-detector.js` |
 | 7 | Callback de error en webcam-permission-dialog | 30 min | `webcam-permission-dialog.js`, `main.js` |
-| 8 | `DEBUG: false` en constants | 1 min | `constants.js` |
+| 8 | `DEBUG: false` en constants | 1 min | `constants.js` | h
 
 ### Fase Corta (< 3 días)
 | # | Fix | Esfuerzo |
