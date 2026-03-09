@@ -209,8 +209,11 @@ export function createLiveCaption() {
             urlContainer = null;
         }
         
-        // Process text for URLs
-        const processed = processTextWithURLs(caption || PROMPTS.fallbackCaption);
+        // Skip expensive URL detection regex during high-frequency streaming
+        const rawText = caption || PROMPTS.fallbackCaption;
+        const processed = isStreaming 
+            ? { text: rawText, urls: [] } 
+            : processTextWithURLs(rawText);
         
         // Trigger fade-in animation by removing and re-adding
         captionText.style.animation = 'none';
