@@ -65,6 +65,8 @@ class WebGPUDetector {
      * @returns {Promise<Object>} Detection results
      */
     async detect() {
+        performance.mark('vlm:webgpu-detect-start');
+
         // Return cached result if already detected
         if (this._cachedResult) return this._cachedResult;
         // Deduplicate concurrent calls (e.g. index.html + main.js racing)
@@ -76,6 +78,17 @@ class WebGPUDetector {
             return this._cachedResult;
         } finally {
             this._detectPromise = null;
+            performance.mark('vlm:webgpu-detect-end');
+            
+            try {
+                performance.measure('WebGPU Detection', 'vlm:webgpu-detect-start', 'vlm:webgpu-detect-end');
+                const measure = performance.getEntriesByName('WebGPU Detection').pop();
+                if (measure) {
+                    console.log(`⏱️ WebGPU Detection took ${measure.duration.toFixed(2)}ms`);
+                }
+            } catch (e) {
+                // Ignore missing marks in older environments
+            }
         }
     }
 

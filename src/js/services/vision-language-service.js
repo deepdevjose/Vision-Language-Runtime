@@ -43,6 +43,7 @@ class VLMService {
         this.loadPromise = (async () => {
             try {
                 // Detect WebGPU and FP16 support before loading model
+                performance.mark('vlm:model-load-start');
                 onProgress?.('Detecting GPU capabilities...', 5);
                 const gpuInfo = await webgpuDetector.detect();
 
@@ -60,6 +61,7 @@ class VLMService {
 
                 onProgress?.('Loading processor...', 10);
                 this.processor = await AutoProcessor.from_pretrained(MODEL_CONFIG.MODEL_ID);
+                performance.mark('vlm:processor-loaded');
 
                 onProgress?.('Processor loaded. Loading model...', 20);
                 this.model = await AutoModelForImageTextToText.from_pretrained(MODEL_CONFIG.MODEL_ID, {
@@ -88,11 +90,24 @@ class VLMService {
 
                 onProgress?.('Model loaded successfully!', 80);
                 this.isLoaded = true;
+                performance.mark('vlm:model-weights-loaded');
 
                 // Warmup: Run 1-2 dummy inferences to stabilize latencies
                 onProgress?.('Warming up inference pipeline...', 85);
                 await this.performWarmup();
                 onProgress?.('Warmup complete!', 95);
+                performance.mark('vlm:model-load-end');
+                
+                try {
+                    performance.measure('Model Load Total', 'vlm:model-load-start', 'vlm:model-load-end');
+                    performance.measure('Processor Load', 'vlm:model-load-start', 'vlm:processor-loaded');
+                    performance.measure('Weights Download/Load', 'vlm:processor-loaded', 'vlm:model-weights-loaded');
+                    
+                    if (MODEL_CONFIG.DEBUG) {
+                        const totalMatch = performance.getEntriesByName('Model Load Total').pop();
+                        console.log(`⏱️ Total Model Load: ${(totalMatch.duration / 1000).toFixed(2)}s`);
+                    }
+                } catch(e) {}
             } catch (error) {
                 console.error('Error loading model:', error);
                 throw error;
@@ -161,7 +176,13 @@ class VLMService {
         }
 
         try {
+            performance.mark('vlm:inference-start');
             const result = await this._runInferenceCore(video, instruction, onTextUpdate, false);
+            performance.mark('vlm:inference-end');
+            
+            try {
+                performance.measure('Total Inference', 'vlm:inference-start', 'vlm:inference-end');
+            } catch(e) {}
 
             // Track inference time for dynamic FPS adjustment
             const elapsedTime = performance.now() - startTime;
@@ -246,6 +267,7 @@ class VLMService {
 
         // Draw current video frame to canvas (downscaled)
         this.ctx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
+        performance.mark('vlm:post-processing-start');
 
         // Run fast native QR detection before VLM reasoning
         let qrContext = '';
@@ -300,6 +322,7 @@ class VLMService {
         const inputs = await this.processor(rawImg, prompt, {
             add_special_tokens: false
         });
+        performance.mark('vlm:model-execution-start');
 
         if (MODEL_CONFIG.DEBUG) console.log('🤖 Running model inference...');
         // Run inference with streaming
@@ -328,6 +351,11 @@ class VLMService {
         });
 
         if (MODEL_CONFIG.DEBUG && !isWarmup) console.log(`✅ Model output generated (${maxTokens} max tokens)`);
+        
+        try {
+            performance.measure('Image Processing', 'vlm:post-processing-start', 'vlm:model-execution-start');
+            performance.measure('Model Execution', 'vlm:model-execution-start', 'vlm:inference-end');
+        } catch(e) {}
 
         // If streaming worked, use that result to avoid redundant decoding
         const finalText = streamed.trim() || this.processor.batch_decode(

@@ -6,6 +6,8 @@
  * Separates view state from runtime state.
  */
 
+performance.mark('vlm:app-boot-start');
+
 import StateMachine from './utils/state-machine.js';
 import { clearChildren, createElement } from './utils/dom-helpers.js';
 import { createWebcamPermissionDialog } from './components/webcam-permission-dialog.js';
@@ -137,6 +139,18 @@ function getVideoBlur(viewState) {
  */
 function render(state) {
     const { viewState, runtimeState, webcamStream, isVideoReady, error } = state;
+
+    // Transition out of welcome/intro modes initiates core app rendering loop
+    if (previousViewState === null) {
+        performance.mark('vlm:app-ready');
+        try {
+            performance.measure('App Boot Time', 'vlm:app-boot-start', 'vlm:app-ready');
+            const bootMeasure = performance.getEntriesByName('App Boot Time').pop();
+            if (bootMeasure && bootMeasure.duration > 0) {
+                console.log(`🚀 App Booted in ${(bootMeasure.duration).toFixed(2)}ms`);
+            }
+        } catch(e) {}
+    }
 
     // Always update video properties without rebuilding DOM
     if (videoElement && webcamStream) {
