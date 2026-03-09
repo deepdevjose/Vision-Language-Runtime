@@ -36,8 +36,16 @@
  * @property {string} event - Event name
  * @property {ViewState | '*'} from - Source state (or '*' for any state)
  * @property {ViewState} to - Target state
- * @property {Function} [guard] - Guard function (returns boolean)
- * @property {Function} [action] - Side effect to execute
+ * @property {(data?: any) => boolean} [guard] - Guard function (returns boolean)
+ * @property {(data?: any) => void} [action] - Side effect to execute
+ */
+
+/**
+ * @typedef {Object} ErrorPayload
+ * @property {string} [code] - Internal error code mapping
+ * @property {string} message - Human readable reason
+ * @property {any} [technical] - Raw error object
+ * @property {RecoverAction} [recoverAction] - Predefined recovery path
  */
 
 /**
@@ -235,17 +243,33 @@ class StateMachine extends EventTarget {
                 }
             },
             {
+                event: 'ERROR',
+                from: '*',
+                to: 'error',
+                action: (data) => {
+                    this.state.error = {
+                        code: data?.code || 'UNKNOWN_COMPONENT_ERROR',
+                        message: data?.message || 'Component failed unexpectedly',
+                        technical: data?.technical,
+                        recoverAction: {
+                            label: 'Reload Application',
+                            handler: () => window.location.reload()
+                        }
+                    };
+                }
+            },
+            {
                 event: 'FATAL_ERROR',
                 from: '*', // Any state
                 to: 'error',
                 action: (data) => {
                     this.state.runtimeState = 'failed';
                     this.state.error = {
-                        code: data.code || 'UNKNOWN_ERROR',
-                        message: data.message || 'An unexpected error occurred',
-                        technical: data.technical,
-                        recoverAction: data.recoverAction || {
-                            label: 'Reload Page',
+                        code: data?.code || 'FATAL_ERROR',
+                        message: data?.message || 'A catastrophic error occurred',
+                        technical: data?.technical,
+                        recoverAction: data?.recoverAction || {
+                            label: 'Reload Application',
                             handler: () => window.location.reload()
                         }
                     };
