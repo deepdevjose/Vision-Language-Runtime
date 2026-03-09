@@ -305,5 +305,5 @@ const sourceHeight = video.videoHeight || video.height || 240;
 | 18 | QoS tier: modo lite para móviles | 1 día |
 | 19 | Pipeline imagen: reusar buffer `ImageData` | 1 día |
 | 20 | Instrumentar métricas con `performance.mark` | 1 día |
-| 21 | ESLint config + `checkJs` en módulos críticos | 4 hr |
-| 22 | Optimizar hot path: skip regex URL en streaming | 2 hr |
+| ✅ | ESLint config + `checkJs` en módulos críticos | 4 hr |
+| ✅ | Optimizar hot path: skip regex URL en streaming | 2 hr |

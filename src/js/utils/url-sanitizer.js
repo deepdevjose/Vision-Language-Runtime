@@ -10,10 +10,10 @@ import logger from './logger.js';
  */
 const URL_PATTERNS = {
     // Standard URLs with protocol
-    withProtocol: /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/gi,
+    withProtocol: /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)/gi,
     
     // URLs without protocol (e.g., www.example.com, example.com)
-    withoutProtocol: /(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/gi,
+    withoutProtocol: /(?:www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)/gi,
     
     // Email-like patterns (to exclude)
     email: /\S+@\S+\.\S+/gi
@@ -186,7 +186,6 @@ export function processTextWithURLs(text) {
     
     let processedText = text;
     const urlData = [];
-    let offset = 0; // Track text length changes
     
     // Replace URLs with placeholders (from end to start to preserve indices)
     [...detectedURLs].reverse().forEach((urlInfo, reverseIndex) => {

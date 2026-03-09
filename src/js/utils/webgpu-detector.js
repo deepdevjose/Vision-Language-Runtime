@@ -95,7 +95,7 @@ class WebGPUDetector {
 
         try {
             // Check if WebGPU is available
-            if (!navigator.gpu) {
+            if (!/** @type {any} */(navigator).gpu) {
                 console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
                 console.error('❌ WebGPU Not Available');
                 console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -111,7 +111,7 @@ class WebGPUDetector {
             }
 
             // Request adapter
-            this.adapter = await navigator.gpu.requestAdapter({
+            this.adapter = await /** @type {any} */(navigator).gpu.requestAdapter({
                 powerPreference: 'high-performance'
             });
 
@@ -167,7 +167,7 @@ class WebGPUDetector {
     /**
      * Request a WebGPU device with optimal features
      * Automatically requests FP16 if available
-     * @returns {Promise<GPUDevice>}
+     * @returns {Promise<any>}
      */
     async requestDevice() {
         if (!this.adapter) {

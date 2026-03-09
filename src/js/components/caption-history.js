@@ -80,7 +80,7 @@ export function createCaptionHistory() {
             return;
         }
 
-        history.forEach((entry, index) => {
+        history.forEach((entry) => {
             const item = createElement('div', {
                 className: 'caption-history-item'
             });

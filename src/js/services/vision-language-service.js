@@ -1,8 +1,10 @@
+// @ts-check
 /**
  * VLM (Vision Language Model) Service
  * Handles loading and running inference with FastVLM model
  */
 
+// @ts-ignore
 import { AutoProcessor, AutoModelForImageTextToText, RawImage, TextStreamer } from '@huggingface/transformers';
 import { MODEL_CONFIG } from '../utils/constants.js';
 import webgpuDetector from '../utils/webgpu-detector.js';
@@ -34,11 +36,9 @@ class VLMService {
         }
 
         this.isLoading = true;
-
+        
         // Track progress for multiple files
         const fileProgress = new Map();
-        let totalFiles = 0;
-        let completedFiles = 0;
 
         this.loadPromise = (async () => {
             try {
@@ -82,10 +82,6 @@ class VLMService {
                             const overallPercent = Math.round(avgProgress);
 
                             onProgress?.(`Downloading model files... (${fileProgress.size} files)`, 20 + (overallPercent * 0.6));
-                        } else if (data.status === 'done') {
-                            completedFiles++;
-                        } else if (data.status === 'initiate') {
-                            totalFiles++;
                         }
                     }
                 });
@@ -195,8 +191,7 @@ class VLMService {
         // Initialize BarcodeDetector once if supported
         if (!this.barcodeDetector && 'BarcodeDetector' in window) {
             try {
-                // @ts-ignore
-                this.barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
+                this.barcodeDetector = new (/** @type {any} */(window).BarcodeDetector)({ formats: ['qr_code'] });
             } catch (err) {
                 console.warn('BarcodeDetector initialization failed:', err);
             }

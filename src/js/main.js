@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * VLM Runtime - Main Entry
  * 
@@ -367,7 +368,7 @@ onStreamEnded((errorMessage) => {
 
 // Subscribe to state changes
 stateMachine.addEventListener('statechange', (event) => {
-    const { state, prevState, event: eventName } = event.detail;
+    const { state, prevState, event: eventName } = /** @type {CustomEvent} */ (event).detail;
 
     // Reset video element when recovering from error / stream loss
     if ((eventName === 'RETRY' || eventName === 'RETRY_STREAM') && videoElement) {
@@ -408,8 +409,8 @@ logger.info('Vision-Language Runtime initialized', {
 });
 
 // Expose diagnostics panel globally for console access
-window.__VLM_DIAGNOSTICS__ = diagnosticsPanel;
-window.__VLM_LOGGER__ = logger;
+/** @type {any} */ (window).__VLM_DIAGNOSTICS__ = diagnosticsPanel;
+/** @type {any} */ (window).__VLM_LOGGER__ = logger;
 
 console.log('%c🔍 Diagnostics Panel', 'color: #00a8ff; font-weight: bold');
 console.log('%cPress Ctrl+Shift+D to open diagnostics', 'color: #888');

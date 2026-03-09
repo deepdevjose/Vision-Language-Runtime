@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Captioning View — Split layout: Camera | Response
  * Prompt + chips span full width below
  */
@@ -6,7 +6,6 @@
 import { createElement, sleep } from '../utils/dom-helpers.js';
 import { PROMPTS, MODEL_CONFIG } from '../utils/constants.js';
 import { enumerateCameras, switchCamera } from '../services/webcam-service.js';
-import logger from '../utils/logger.js';
 
 let vlmService = null;
 
@@ -93,7 +92,9 @@ export function createCaptioningView(videoElement) {
                 a.click();
                 URL.revokeObjectURL(url);
             }, 'image/png');
-        } catch (e) { }
+        } catch (e) { 
+            // empty catch 
+        }
     });
 
     // ── Camera switcher (only visible when >1 camera) ─────────
@@ -283,7 +284,11 @@ export function createCaptioningView(videoElement) {
     container.appendChild(promptSection);
 
     // ── Helpers ───────────────────────────────────────────────
-    function setStatus() {
+    /**
+     * @param {string} [text]
+     * @param {boolean} [isError]
+     */
+    function setStatus(text, isError) {
         // Status is now visual-only via live pill dot — no text label
     }
 
@@ -381,7 +386,7 @@ export function createCaptioningView(videoElement) {
                             outputText.textContent = clean;
                             outputText.className = 'rt-output-text ready';
                             outputCursor.style.display = 'none';
-                            outputTime.textContent = new Date().toLocaleTimeString();
+                            outputTime.textContent = elapsed + 's';
 
                             // Show caption pill on video
                             showCaptionPill(clean);

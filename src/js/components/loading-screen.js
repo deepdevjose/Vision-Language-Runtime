@@ -3,7 +3,6 @@
  */
 
 import { createElement } from '../utils/dom-helpers.js';
-import { GLASS_EFFECTS } from '../utils/constants.js';
 import logger from '../utils/logger.js';
 
 export function createLoadingScreen(onPhaseChange, onComplete, onError) {
@@ -72,7 +71,6 @@ export function createLoadingScreen(onPhaseChange, onComplete, onError) {
 
     // ── Helpers ────────────────────────────────────────────
     let progress = 0;
-    let isError = false;
 
     function setProgress(pct, thinking) {
         progress = Math.max(progress, pct);
@@ -98,7 +96,6 @@ export function createLoadingScreen(onPhaseChange, onComplete, onError) {
     }
 
     function showError(message) {
-        isError = true;
         title.textContent = 'Initialization Failed';
         subtitle.textContent = message;
         subtitle.classList.add('ls-subtitle-error');
@@ -119,8 +116,8 @@ export function createLoadingScreen(onPhaseChange, onComplete, onError) {
             setProgress(5, 'Checking GPU availability...');
             logger.info('Loading phase: WebGPU');
 
-            if (!navigator.gpu) {
-                const error = new Error('WebGPU not available');
+            if (!/** @type {any} */(navigator).gpu) {
+                const error = /** @type {Error & {code?: string}} */(new Error('WebGPU not available'));
                 error.code = 'WEBGPU_NOT_SUPPORTED';
                 onError?.(error);
                 showError('WebGPU not supported in this browser');
@@ -180,7 +177,7 @@ export function createLoadingScreen(onPhaseChange, onComplete, onError) {
 
         } catch (error) {
             logger.error('Runtime initialization failed', { error: error.message });
-            error.code = error.code || 'MODEL_LOAD_FAILED';
+            /** @type {any} */(error).code = /** @type {any} */(error).code || 'MODEL_LOAD_FAILED';
             onError?.(error);
             showError(error.message);
         }

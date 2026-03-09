@@ -1,0 +1,25 @@
+{
+  "env": {
+    "browser": true,
+    "es2022": true,
+    "node": true
+  },
+  "extends": "eslint:recommended",
+  "parserOptions": {
+    "ecmaVersion": "latest",
+    "sourceType": "module"
+  },
+  "rules": {
+    "no-unused-vars": ["warn"],
+    "no-undef": "error"
+  },
+  "globals": {
+    "Document": "readonly",
+    "HTMLElement": "readonly",
+    "HTMLVideoElement": "readonly",
+    "HTMLCanvasElement": "readonly",
+    "MediaStream": "readonly",
+    "GPUAdapter": "readonly",
+    "GPUDevice": "readonly"
+  }
+}

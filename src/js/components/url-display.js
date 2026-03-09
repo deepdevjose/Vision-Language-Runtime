@@ -6,7 +6,7 @@
 import { createElement } from '../utils/dom-helpers.js';
 import { createGlassContainer } from './glass-container.js';
 import { createGlassButton } from './glass-button.js';
-import { createSafeClickableURL, sanitizeURL } from '../utils/url-sanitizer.js';
+import { createSafeClickableURL } from '../utils/url-sanitizer.js';
 import logger from '../utils/logger.js';
 
 /**

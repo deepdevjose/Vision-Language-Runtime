@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Webcam service for managing camera stream
  * Mobile-optimized with fallback constraints
@@ -171,7 +172,7 @@ async function attemptAutoRecovery(preferFrontCamera = true) {
     await new Promise(resolve => setTimeout(resolve, backoffDelay));
     
     try {
-        const stream = await requestWebcamPermission(preferFrontCamera);
+        await requestWebcamPermission(preferFrontCamera);
         console.log('✅ Camera stream recovered successfully');
         recoveryAttempts = 0; // Reset on success
         return true;
@@ -302,7 +303,7 @@ export async function requestWebcamPermission(preferFrontCamera = true) {
         });
         
         // Throw enriched error with all details
-        const enrichedError = new Error(errorInfo.message);
+        const enrichedError = /** @type {Error & {errorInfo?: any}} */ (new Error(errorInfo.message));
         enrichedError.errorInfo = errorInfo;
         throw enrichedError;
     }

@@ -237,7 +237,7 @@ export async function fileToCanvas(file) {
         
         const reader = new FileReader();
         reader.onload = (e) => {
-            img.src = e.target.result;
+            img.src = /** @type {string} */ (e.target.result);
         };
         reader.onerror = () => {
             reject(new Error('Failed to read file'));
