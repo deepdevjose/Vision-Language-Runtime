@@ -6,7 +6,7 @@
 
 // @ts-ignore
 import { AutoProcessor, AutoModelForImageTextToText, RawImage, TextStreamer } from '@huggingface/transformers';
-import { MODEL_CONFIG } from '../utils/constants.js';
+import { MODEL_CONFIG, QOS_PROFILES, TIMING } from '../utils/constants.js';
 import webgpuDetector from '../utils/webgpu-detector.js';
 
 class VLMService {
@@ -24,6 +24,7 @@ class VLMService {
         this.avgInferenceTime = 3000; // Initial estimate: 3s
         this.inferenceHistory = []; // Track last 5 inference times
         this.cachedRawImage = null;
+        this.performanceTier = 'high'; // Default assumption until detected
     }
 
     async loadModel(onProgress) {
@@ -54,7 +55,9 @@ class VLMService {
 
                 // Show performance estimate
                 const perfEstimate = webgpuDetector.getPerformanceEstimate();
-                console.log(`⚡ Expected Performance: ${perfEstimate.tier.toUpperCase()} tier (${perfEstimate.expectedLatency})`);
+                this.performanceTier = perfEstimate.tier;
+                
+                console.log(`⚡ Detected Hardware Tier: ${this.performanceTier.toUpperCase()} tier (${perfEstimate.expectedLatency})`);
                 if (perfEstimate.recommendations.length > 0) {
                     console.log('💡 Recommendations:');
                     perfEstimate.recommendations.forEach(rec => console.log(`   ${rec}`));
@@ -233,7 +236,10 @@ class VLMService {
         // This allows warmup to pass a canvas instead of a video element.
         const videoWidth = video.videoWidth || video.width || 320;
         const videoHeight = video.videoHeight || video.height || 240;
-        const maxSize = MODEL_CONFIG.MAX_INFERENCE_SIZE || 640;
+        
+        // Map extraction constraints based on Hardware Performance Tier
+        const currentProfile = QOS_PROFILES[this.performanceTier] || QOS_PROFILES.high;
+        const maxSize = currentProfile.MAX_INFERENCE_SIZE;
 
         let canvasWidth, canvasHeight;
         if (videoWidth > videoHeight) {
@@ -301,14 +307,11 @@ class VLMService {
 
         if (MODEL_CONFIG.DEBUG) console.log('📸 Captured frame:', canvasWidth, 'x', canvasHeight);
 
-        // Detect if mobile for concise mode
-        const isMobile = window.matchMedia('(max-width: 768px)').matches;
-        const maxTokens = isMobile ? MODEL_CONFIG.MAX_NEW_TOKENS_MOBILE : MODEL_CONFIG.MAX_NEW_TOKENS;
+        // Map behavior based on Hardware Performance Tier
+        const maxTokens = currentProfile.MAX_NEW_TOKENS;
 
         // Prepare messages for the model
-        let systemPrompt = isMobile
-            ? 'You are a visual AI. Answer in ONE short sentence (8-14 words). No lists, no explanations, no step-by-step. Just the answer.'
-            : 'You are a helpful visual AI assistant. Respond concisely and accurately to the user\'s query in one sentence.';
+        let systemPrompt = currentProfile.SYSTEM_PROMPT;
 
         // Append QR context if found
         if (qrContext) {
@@ -378,11 +381,12 @@ class VLMService {
     }
 
     getDynamicFrameDelay() {
-        // Calculate optimal delay based on average inference time
-        // If inference takes 2s, don't try to capture every 100ms
-        // Add 20% buffer to prevent queue buildup
+        const currentProfile = QOS_PROFILES[this.performanceTier] || QOS_PROFILES.high;
+        
+        // Calculate optimal delay based on average inference time (add 20% breathing room buffer),
+        // but never drop below the hardware profile's safety threshold ceiling.
         const recommendedDelay = Math.max(
-            1000, // Minimum 1s between captures
+            currentProfile.TIMING_DELAY_MS,
             this.avgInferenceTime * 1.2
         );
         return recommendedDelay;

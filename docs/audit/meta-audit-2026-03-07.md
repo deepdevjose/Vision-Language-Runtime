@@ -302,7 +302,7 @@ const sourceHeight = video.videoHeight || video.height || 240;
 | # | Fix | Esfuerzo |
 |---|-----|----------|
 | ✅ | Refactorizar SM: contratos formales todos los eventos | 1 día |
-| 18 | QoS tier: modo lite para móviles | 1 día |
+| ✅ | QoS tier: modo lite para móviles | 1 día |
 | ✅ | Pipeline imagen: reusar buffer `ImageData` | 1 día |
 | ✅ | Instrumentar métricas con `performance.mark` | 1 día |
 | ✅ | ESLint config + `checkJs` en módulos críticos | 4 hr |

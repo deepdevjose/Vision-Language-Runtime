@@ -34,10 +34,32 @@ export const LAYOUT = {
 
 // Timing constants
 export const TIMING = {
-    FRAME_CAPTURE_DELAY: 3000,  // 3 seconds between inferences (was 50ms - too fast!)
+    FRAME_CAPTURE_DELAY: 3000,  // Default fallback
     VIDEO_RECOVERY_INTERVAL: 1000,
     RESIZE_DEBOUNCE: 50,
     SUGGESTION_DELAY: 50
+};
+
+// Quality of Service (QoS) Profiles - Hardware Target Boundaries
+export const QOS_PROFILES = {
+    low: {
+        MAX_INFERENCE_SIZE: 320,
+        MAX_NEW_TOKENS: 32,
+        TIMING_DELAY_MS: 5000,
+        SYSTEM_PROMPT: 'You are a visual AI. Answer in ONE short sentence (8-14 words). No lists, no explanations, no step-by-step. Just the answer.'
+    },
+    medium: {
+        MAX_INFERENCE_SIZE: 480,
+        MAX_NEW_TOKENS: 64,
+        TIMING_DELAY_MS: 3500,
+        SYSTEM_PROMPT: 'You are a visual AI. Answer concisely (maximum 2 sentences).'
+    },
+    high: {
+        MAX_INFERENCE_SIZE: 640,
+        MAX_NEW_TOKENS: 128,
+        TIMING_DELAY_MS: 2000,
+        SYSTEM_PROMPT: 'You are a helpful visual AI assistant. Respond concisely and accurately to the user\'s query in one sentence.'
+    }
 };
 
 // Prompts
@@ -76,14 +98,10 @@ export const LANGUAGE_KEYWORDS = {
     french: ['français', 'quoi', 'comment', 'où', 'quand', 'pourquoi', 'décrire']
 };
 
-// Model configuration
 export const MODEL_CONFIG = {
     MODEL_ID: 'onnx-community/FastVLM-0.5B-ONNX',
-    MAX_NEW_TOKENS: 128,  // Reduced from 512 to speed up inference
-    MAX_NEW_TOKENS_MOBILE: 48, // Very concise for mobile (8-14 words)
-    // Inference optimization: downsample video frames to reduce pixel copying
-    // Model doesn't need full resolution - this greatly improves performance
-    MAX_INFERENCE_SIZE: 640,  // Max dimension for inference (width or height)
+    MAX_NEW_TOKENS: 128,  // Used as absolute cap
+    MAX_INFERENCE_SIZE: 640,  // Used as absolute cap
     DEBUG: typeof window !== 'undefined' &&
         (window.location.hostname === 'localhost' ||
             window.location.hostname === '127.0.0.1' ||
