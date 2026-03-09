@@ -27,6 +27,9 @@ export function createAsciiBackground(videoElement) {
         fps: 10,                // Target FPS (throttled via rAF)
         aspectCorrection: 0.55  // Characters aren't square
     };
+    
+    // Persistent buffer array to reduce GC allocations map -> join
+    let outputBuffer = [];
 
     const frameInterval = 1000 / config.fps;
 
@@ -52,8 +55,12 @@ export function createAsciiBackground(videoElement) {
             const rows = Math.floor(config.cols * aspect * config.aspectCorrection);
 
             // Resize canvas to ASCII resolution (very low res for performance)
-            canvas.width = config.cols;
-            canvas.height = rows;
+            if (canvas.width !== config.cols || canvas.height !== rows) {
+                canvas.width = config.cols;
+                canvas.height = rows;
+                // Pre-allocate buffer length cleanly
+                outputBuffer = new Array(rows);
+            }
 
             // Draw downscaled video frame
             ctx.drawImage(videoElement, 0, 0, config.cols, rows);
@@ -62,8 +69,8 @@ export function createAsciiBackground(videoElement) {
             const { data } = ctx.getImageData(0, 0, config.cols, rows);
 
             // Convert pixels to ASCII
-            let output = "";
             for (let y = 0; y < rows; y++) {
+                let rowChars = "";
                 const rowOffset = y * config.cols * 4;
                 for (let x = 0; x < config.cols; x++) {
                     const i = rowOffset + x * 4;
@@ -72,7 +79,6 @@ export function createAsciiBackground(videoElement) {
                     const b = data[i + 2];
 
                     // Calculate perceptual luminance (ITU-R BT.709)
-                    // yes this exact formula matters, yes I tested simpler versions, no they don't look as good
                     const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 
                     // Map luminance to character index
@@ -81,12 +87,12 @@ export function createAsciiBackground(videoElement) {
                         Math.floor(luma * (chars.length - 1))
                     );
 
-                    output += chars[charIndex];
+                    rowChars += chars[charIndex];
                 }
-                output += "\n";
+                outputBuffer[y] = rowChars;
             }
 
-            pre.textContent = output;
+            pre.textContent = outputBuffer.join("\n");
         } catch (err) {
             // Silently handle errors (e.g., video not ready)
             console.warn('ASCII render error:', err);

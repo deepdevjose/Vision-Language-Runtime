@@ -23,6 +23,7 @@ class VLMService {
         this.lastInferenceTime = 0;
         this.avgInferenceTime = 3000; // Initial estimate: 3s
         this.inferenceHistory = []; // Track last 5 inference times
+        this.cachedRawImage = null;
     }
 
     async loadModel(onProgress) {
@@ -258,6 +259,7 @@ class VLMService {
         if (this.canvas.width !== canvasWidth || this.canvas.height !== canvasHeight) {
             this.canvas.width = canvasWidth;
             this.canvas.height = canvasHeight;
+            this.cachedRawImage = null; // Invalidate cache on resize
             if (MODEL_CONFIG.DEBUG) console.log(`📐 Canvas resized to ${canvasWidth}x${canvasHeight} (from ${videoWidth}x${videoHeight})`);
         }
 
@@ -288,7 +290,14 @@ class VLMService {
 
         // Get image data
         const frame = this.ctx.getImageData(0, 0, canvasWidth, canvasHeight);
-        const rawImg = new RawImage(frame.data, frame.width, frame.height, 4);
+        
+        // Reuse RawImage buffer to minimize GC pressure
+        if (!this.cachedRawImage) {
+            this.cachedRawImage = new RawImage(frame.data, frame.width, frame.height, 4);
+        } else {
+            // Update the underlying array instead of instantiating a new object
+            this.cachedRawImage.data.set(frame.data);
+        }
 
         if (MODEL_CONFIG.DEBUG) console.log('📸 Captured frame:', canvasWidth, 'x', canvasHeight);
 
@@ -319,7 +328,7 @@ class VLMService {
         });
 
         if (MODEL_CONFIG.DEBUG) console.log('📝 Processing inputs...');
-        const inputs = await this.processor(rawImg, prompt, {
+        const inputs = await this.processor(this.cachedRawImage, prompt, {
             add_special_tokens: false
         });
         performance.mark('vlm:model-execution-start');
