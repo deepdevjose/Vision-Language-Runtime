@@ -297,8 +297,15 @@ class VLMService {
         // Get image data
         const frame = this.ctx.getImageData(0, 0, canvasWidth, canvasHeight);
         
-        // Reuse RawImage buffer to minimize GC pressure
-        if (!this.cachedRawImage) {
+        // Reuse RawImage buffer to minimize GC pressure.
+        // If dimensions/channels change, recreate it to avoid TypedArray.set out-of-bounds.
+        const expectedSize = frame.width * frame.height * 4;
+        const canReuseRawImage = !!this.cachedRawImage
+            && this.cachedRawImage.width === frame.width
+            && this.cachedRawImage.height === frame.height
+            && this.cachedRawImage.data?.length === expectedSize;
+
+        if (!canReuseRawImage) {
             this.cachedRawImage = new RawImage(frame.data, frame.width, frame.height, 4);
         } else {
             // Update the underlying array instead of instantiating a new object
