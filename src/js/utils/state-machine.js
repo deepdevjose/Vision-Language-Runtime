@@ -1,5 +1,7 @@
 // @ts-check
 
+import { transitionMap } from './transitions/index.js';
+
 /**
  * @typedef {'permission' | 'welcome' | 'loading' | 'runtime' | 'error' | 'image-upload'} ViewState
  * @typedef {'idle' | 'warming' | 'running' | 'paused' | 'recovering' | 'failed'} RuntimeState
@@ -77,216 +79,33 @@ class StateMachine extends EventTarget {
 
     /**
      * Define all valid state transitions
+     * Imports modularized transitions from domain-specific modules:
+     * - Permissions: Camera access flows
+     * - Loading: Model initialization and warmup
+     * - Runtime: Live inference, pause/resume, stream recovery
+     * - Errors: Error handling and recovery
+     * 
+     * Each guard and action is bound to this StateMachine instance for proper state access
+     * 
      * @returns {StateTransition[]}
      */
     defineTransitions() {
-        return [
-            // Permission flow
-            {
-                event: 'PERMISSION_GRANTED',
-                from: 'permission',
-                to: 'loading',
-                guard: (data) => !!data.stream,
-                action: (data) => {
-                    this.state.webcamStream = data.stream;
-                    this.state.loadingPhase = 'loading-wgpu';
-                }
-            },
-            {
-                event: 'PERMISSION_DENIED',
-                from: 'permission',
-                to: 'error',
-                action: (data) => {
-                    this.state.error = {
-                        code: 'CAMERA_DENIED',
-                        message: data.message || 'Camera access denied',
-                        technical: data.technical,
-                        recoverAction: {
-                            label: 'Retry',
-                            handler: () => this.dispatch('RETRY')
-                        }
-                    };
-                }
-            },
+        // Bind all transition guards and actions to this instance's context
+        return transitionMap.map(transition => {
+            const wrapped = { ...transition };
 
-            // Welcome flow
-            {
-                event: 'START',
-                from: 'welcome',
-                to: 'permission',
-                guard: () => this.state.hasWebGPU
-            },
-            {
-                event: 'START_FALLBACK',
-                from: 'welcome',
-                to: 'image-upload',
-                guard: () => !this.state.hasWebGPU
-            },
-
-            // Loading phases
-            {
-                event: 'WGPU_READY',
-                from: 'loading',
-                to: 'loading',
-                action: () => {
-                    this.state.loadingPhase = 'loading-model';
-                }
-            },
-            {
-                event: 'MODEL_LOADED',
-                from: 'loading',
-                to: 'loading',
-                action: () => {
-                    this.state.loadingPhase = 'warming-up';
-                    this.state.runtimeState = 'warming';
-                }
-            },
-            {
-                event: 'WARMUP_COMPLETE',
-                from: 'loading',
-                to: 'runtime',
-                guard: () => this.state.isVideoReady,
-                action: () => {
-                    this.state.loadingPhase = 'complete';
-                    this.state.runtimeState = 'running';
-                }
-            },
-            // Late WARMUP_COMPLETE — absorb gracefully when already in runtime
-            // (happens when video readiness triggered the loading→runtime transition
-            //  before the warmup callback fires)
-            {
-                event: 'WARMUP_COMPLETE',
-                from: 'runtime',
-                to: 'runtime'
-                // No action needed — already running
-            },
-
-            // Runtime flow
-            {
-                event: 'PAUSE',
-                from: 'runtime',
-                to: 'runtime',
-                action: () => {
-                    this.state.runtimeState = 'paused';
-                }
-            },
-            {
-                event: 'RESUME',
-                from: 'runtime',
-                to: 'runtime',
-                action: () => {
-                    this.state.runtimeState = 'running';
-                }
-            },
-            {
-                event: 'STREAM_ENDED',
-                from: 'runtime',
-                to: 'runtime',
-                action: (data) => {
-                    this.state.runtimeState = 'recovering';
-                    this.state.error = {
-                        code: 'STREAM_LOST',
-                        message: data.reason || 'Camera stream lost',
-                        recoverAction: {
-                            label: 'Reconnect',
-                            handler: () => this.dispatch('RETRY_STREAM')
-                        }
-                    };
-                }
-            },
-            {
-                event: 'STREAM_RECOVERED',
-                from: 'runtime',
-                to: 'runtime',
-                guard: () => this.state.runtimeState === 'recovering',
-                action: (data) => {
-                    this.state.webcamStream = data.stream;
-                    this.state.runtimeState = 'running';
-                    this.state.error = null;
-                }
-            },
-
-            // Stream retry — user clicks "Reconnect" after camera loss
-            {
-                event: 'RETRY_STREAM',
-                from: 'runtime',
-                to: 'permission',
-                guard: () => this.state.runtimeState === 'recovering',
-                action: () => {
-                    // Stop existing dead stream
-                    if (this.state.webcamStream) {
-                        this.state.webcamStream.getTracks().forEach(t => t.stop());
-                    }
-                    this.state.webcamStream = null;
-                    this.state.isVideoReady = false;
-                    this.state.error = null;
-                    this.state.runtimeState = 'idle';
-                }
-            },
-
-            // Error states
-            {
-                event: 'MODEL_FAILED',
-                from: 'loading',
-                to: 'error',
-                action: (data) => {
-                    this.state.runtimeState = 'failed';
-                    this.state.error = {
-                        code: 'MODEL_LOAD_FAILED',
-                        message: 'Failed to load AI model',
-                        technical: data.error,
-                        recoverAction: {
-                            label: 'Reload Page',
-                            handler: () => window.location.reload()
-                        }
-                    };
-                }
-            },
-            {
-                event: 'ERROR',
-                from: '*',
-                to: 'error',
-                action: (data) => {
-                    this.state.error = {
-                        code: data?.code || 'UNKNOWN_COMPONENT_ERROR',
-                        message: data?.message || 'Component failed unexpectedly',
-                        technical: data?.technical,
-                        recoverAction: {
-                            label: 'Reload Application',
-                            handler: () => window.location.reload()
-                        }
-                    };
-                }
-            },
-            {
-                event: 'FATAL_ERROR',
-                from: '*', // Any state
-                to: 'error',
-                action: (data) => {
-                    this.state.runtimeState = 'failed';
-                    this.state.error = {
-                        code: data?.code || 'FATAL_ERROR',
-                        message: data?.message || 'A catastrophic error occurred',
-                        technical: data?.technical,
-                        recoverAction: data?.recoverAction || {
-                            label: 'Reload Application',
-                            handler: () => window.location.reload()
-                        }
-                    };
-                }
-            },
-
-            // Recovery
-            {
-                event: 'RETRY',
-                from: 'error',
-                to: 'permission',
-                action: () => {
-                    this.state.error = null;
-                    this.state.runtimeState = 'idle';
-                }
+            // Wrap guard to bind 'this' context if present
+            if (transition.guard) {
+                wrapped.guard = (data) => transition.guard.call(this, data);
             }
-        ];
+
+            // Wrap action to bind 'this' context if present
+            if (transition.action) {
+                wrapped.action = (data) => transition.action.call(this, data);
+            }
+
+            return wrapped;
+        });
     }
 
     /**
