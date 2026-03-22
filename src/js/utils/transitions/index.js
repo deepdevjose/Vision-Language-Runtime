@@ -6,12 +6,8 @@ import { runtimeTransitions } from './runtime.js';
 import { errorTransitions } from './errors.js';
 
 /**
- * @typedef {Object} StateTransition
- * @property {string} event - Event name
- * @property {string | '*'} from - Source state (or '*' for any state)
- * @property {string} to - Target state
- * @property {(data?: any, state?: any) => boolean} [guard] - Guard function (returns boolean)
- * @property {(state?: any, data?: any) => void} [action] - Side effect to execute
+ * StateTransition type definitions are maintained in state-machine.js
+ * @typedef {import('../state-machine.js').StateTransition} StateTransition
  */
 
 /**

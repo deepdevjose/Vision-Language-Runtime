@@ -4,16 +4,23 @@
  * Runtime domain transitions
  * Handles live inference execution, pause/resume, and stream recovery
  * 
- * Actions and guards are bound to StateMachine context, so 'this' refers to the StateMachine instance
+ * Functions are bound to StateMachine context at initialization,
+ * so 'this' refers to the StateMachine instance.
+ * @see state-machine.js defineTransitions() for binding logic
  */
 
-/** @type {import('./index').StateTransition[]} */
+/**
+ * @typedef {import('../state-machine.js').StateTransition} StateTransition
+ */
+
+/** @type {StateTransition[]} */
 export const runtimeTransitions = [
     // Pause inference
     {
         event: 'PAUSE',
         from: 'runtime',
         to: 'runtime',
+        /** @this {import('../state-machine.js').default} */
         action: function() {
             this.state.runtimeState = 'paused';
         }
@@ -24,6 +31,7 @@ export const runtimeTransitions = [
         event: 'RESUME',
         from: 'runtime',
         to: 'runtime',
+        /** @this {import('../state-machine.js').default} */
         action: function() {
             this.state.runtimeState = 'running';
         }
@@ -34,6 +42,7 @@ export const runtimeTransitions = [
         event: 'STREAM_ENDED',
         from: 'runtime',
         to: 'runtime',
+        /** @this {import('../state-machine.js').default} */
         action: function(data) {
             this.state.runtimeState = 'recovering';
             this.state.error = {
@@ -52,9 +61,11 @@ export const runtimeTransitions = [
         event: 'STREAM_RECOVERED',
         from: 'runtime',
         to: 'runtime',
+        /** @this {import('../state-machine.js').default} */
         guard: function() {
             return this.state.runtimeState === 'recovering';
         },
+        /** @this {import('../state-machine.js').default} */
         action: function(data) {
             this.state.webcamStream = data.stream;
             this.state.runtimeState = 'running';
@@ -67,9 +78,11 @@ export const runtimeTransitions = [
         event: 'RETRY_STREAM',
         from: 'runtime',
         to: 'permission',
+        /** @this {import('../state-machine.js').default} */
         guard: function() {
             return this.state.runtimeState === 'recovering';
         },
+        /** @this {import('../state-machine.js').default} */
         action: function() {
             // Stop existing dead stream
             if (this.state.webcamStream) {

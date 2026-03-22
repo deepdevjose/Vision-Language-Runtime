@@ -4,10 +4,16 @@
  * Permission domain transitions
  * Handles camera permission flows and related state changes
  * 
- * Actions are bound to StateMachine context, so 'this' refers to the StateMachine instance
+ * Each function is bound to StateMachine context at initialization,
+ * so 'this' refers to the StateMachine instance.
+ * @see state-machine.js defineTransitions() for binding logic
  */
 
-/** @type {import('./index').StateTransition[]} */
+/**
+ * @typedef {import('../state-machine.js').StateTransition} StateTransition
+ */
+
+/** @type {StateTransition[]} */
 export const permissionsTransitions = [
     // Permission granted - successful camera access
     {
@@ -15,6 +21,7 @@ export const permissionsTransitions = [
         from: 'permission',
         to: 'loading',
         guard: (data) => !!data.stream,
+        /** @this {import('../state-machine.js').default} */
         action: function(data) {
             this.state.webcamStream = data.stream;
             this.state.loadingPhase = 'loading-wgpu';
@@ -26,6 +33,7 @@ export const permissionsTransitions = [
         event: 'PERMISSION_DENIED',
         from: 'permission',
         to: 'error',
+        /** @this {import('../state-machine.js').default} */
         action: function(data) {
             this.state.error = {
                 code: 'CAMERA_DENIED',

@@ -4,16 +4,23 @@
  * Error domain transitions
  * Handles error states and recovery flows
  * 
- * Actions are bound to StateMachine context, so 'this' refers to the StateMachine instance
+ * Functions are bound to StateMachine context at initialization,
+ * so 'this' refers to the StateMachine instance.
+ * @see state-machine.js defineTransitions() for binding logic
  */
 
-/** @type {import('./index').StateTransition[]} */
+/**
+ * @typedef {import('../state-machine.js').StateTransition} StateTransition
+ */
+
+/** @type {StateTransition[]} */
 export const errorTransitions = [
     // Generic component error - can occur from any state
     {
         event: 'ERROR',
         from: '*',
         to: 'error',
+        /** @this {import('../state-machine.js').default} */
         action: function(data) {
             this.state.error = {
                 code: data?.code || 'UNKNOWN_COMPONENT_ERROR',
@@ -32,6 +39,7 @@ export const errorTransitions = [
         event: 'FATAL_ERROR',
         from: '*',
         to: 'error',
+        /** @this {import('../state-machine.js').default} */
         action: function(data) {
             this.state.runtimeState = 'failed';
             this.state.error = {
@@ -51,6 +59,7 @@ export const errorTransitions = [
         event: 'RETRY',
         from: 'error',
         to: 'permission',
+        /** @this {import('../state-machine.js').default} */
         action: function() {
             this.state.error = null;
             this.state.runtimeState = 'idle';

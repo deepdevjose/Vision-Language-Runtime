@@ -4,16 +4,23 @@
  * Loading domain transitions
  * Handles welcome screen, model loading, and warmup phases
  * 
- * Actions and guards are bound to StateMachine context, so 'this' refers to the StateMachine instance
+ * Functions are bound to StateMachine context at initialization,
+ * so 'this' refers to the StateMachine instance.
+ * @see state-machine.js defineTransitions() for binding logic
  */
 
-/** @type {import('./index').StateTransition[]} */
+/**
+ * @typedef {import('../state-machine.js').StateTransition} StateTransition
+ */
+
+/** @type {StateTransition[]} */
 export const loadingTransitions = [
     // Welcome flow - normal path with WebGPU
     {
         event: 'START',
         from: 'welcome',
         to: 'permission',
+        /** @this {import('../state-machine.js').default} */
         guard: function() {
             return this.state.hasWebGPU;
         }
@@ -24,6 +31,7 @@ export const loadingTransitions = [
         event: 'START_FALLBACK',
         from: 'welcome',
         to: 'image-upload',
+        /** @this {import('../state-machine.js').default} */
         guard: function() {
             return !this.state.hasWebGPU;
         }
@@ -34,6 +42,7 @@ export const loadingTransitions = [
         event: 'WGPU_READY',
         from: 'loading',
         to: 'loading',
+        /** @this {import('../state-machine.js').default} */
         action: function() {
             this.state.loadingPhase = 'loading-model';
         }
@@ -44,6 +53,7 @@ export const loadingTransitions = [
         event: 'MODEL_LOADED',
         from: 'loading',
         to: 'loading',
+        /** @this {import('../state-machine.js').default} */
         action: function() {
             this.state.loadingPhase = 'warming-up';
             this.state.runtimeState = 'warming';
@@ -55,9 +65,11 @@ export const loadingTransitions = [
         event: 'WARMUP_COMPLETE',
         from: 'loading',
         to: 'runtime',
+        /** @this {import('../state-machine.js').default} */
         guard: function() {
             return this.state.isVideoReady;
         },
+        /** @this {import('../state-machine.js').default} */
         action: function() {
             this.state.loadingPhase = 'complete';
             this.state.runtimeState = 'running';
@@ -77,6 +89,7 @@ export const loadingTransitions = [
         event: 'MODEL_FAILED',
         from: 'loading',
         to: 'error',
+        /** @this {import('../state-machine.js').default} */
         action: function(data) {
             this.state.runtimeState = 'failed';
             this.state.error = {
