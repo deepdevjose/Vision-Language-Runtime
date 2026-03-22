@@ -1,10 +1,10 @@
 /**
  * WebGPU Feature Detector
  * Detects WebGPU support and available features (especially FP16/shader-f16)
- * 
+ *
  * Run this early in the app lifecycle to verify GPU capabilities.
  * Critical for mobile devices like Samsung S24+ where FP16 can double performance.
- * 
+ *
  * NOTE: WebGPU ≠ WebGL
  * - WebGL (2011): Used by Three.js, widely supported
  * - WebGPU (2023): New API, better performance, required by Transformers.js
@@ -18,8 +18,8 @@ class WebGPUDetector {
         this.limits = {};
         this.info = {};
         this.browserInfo = this.detectBrowser();
-        this._cachedResult = null;   // Memoized detect() result
-        this._detectPromise = null;  // In-flight promise (dedup concurrent calls)
+        this._cachedResult = null; // Memoized detect() result
+        this._detectPromise = null; // In-flight promise (dedup concurrent calls)
     }
 
     /**
@@ -35,7 +35,9 @@ class WebGPUDetector {
             isEdge: false,
             isFirefox: false,
             isSafari: false,
-            isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
+            isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+                userAgent
+            ),
         };
 
         // Detect browser
@@ -79,9 +81,13 @@ class WebGPUDetector {
         } finally {
             this._detectPromise = null;
             performance.mark('vlm:webgpu-detect-end');
-            
+
             try {
-                performance.measure('WebGPU Detection', 'vlm:webgpu-detect-start', 'vlm:webgpu-detect-end');
+                performance.measure(
+                    'WebGPU Detection',
+                    'vlm:webgpu-detect-start',
+                    'vlm:webgpu-detect-end'
+                );
                 const measure = performance.getEntriesByName('WebGPU Detection').pop();
                 if (measure) {
                     console.log(`⏱️ WebGPU Detection took ${measure.duration.toFixed(2)}ms`);
@@ -103,12 +109,12 @@ class WebGPUDetector {
             adapter: null,
             limits: {},
             vendor: 'Unknown',
-            architecture: 'Unknown'
+            architecture: 'Unknown',
         };
 
         try {
             // Check if WebGPU is available
-            if (!/** @type {any} */(navigator).gpu) {
+            if (!(/** @type {any} */ (navigator).gpu)) {
                 console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
                 console.error('❌ WebGPU Not Available');
                 console.error('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -124,8 +130,8 @@ class WebGPUDetector {
             }
 
             // Request adapter
-            this.adapter = await /** @type {any} */(navigator).gpu.requestAdapter({
-                powerPreference: 'high-performance'
+            this.adapter = await /** @type {any} */ (navigator).gpu.requestAdapter({
+                powerPreference: 'high-performance',
             });
 
             if (!this.adapter) {
@@ -159,18 +165,19 @@ class WebGPUDetector {
             result.limits = {
                 maxBufferSize: this.formatBytes(this.limits.maxBufferSize),
                 maxBufferSizeBytes: this.limits.maxBufferSize,
-                maxStorageBufferBindingSize: this.formatBytes(this.limits.maxStorageBufferBindingSize),
+                maxStorageBufferBindingSize: this.formatBytes(
+                    this.limits.maxStorageBufferBindingSize
+                ),
                 maxStorageBufferBindingSizeBytes: this.limits.maxStorageBufferBindingSize,
                 maxComputeWorkgroupSizeX: this.limits.maxComputeWorkgroupSizeX,
                 maxComputeWorkgroupsPerDimension: this.limits.maxComputeWorkgroupsPerDimension,
-                maxBindGroups: this.limits.maxBindGroups
+                maxBindGroups: this.limits.maxBindGroups,
             };
 
             // Log detection results
             this.logResults(result);
 
             return result;
-
         } catch (error) {
             console.error('❌ WebGPU detection failed:', error);
             return result;
@@ -202,7 +209,7 @@ class WebGPUDetector {
 
             // Request device with features
             this.device = await this.adapter.requestDevice({
-                requiredFeatures
+                requiredFeatures,
             });
 
             console.log('🎮 WebGPU device created with features:', requiredFeatures);
@@ -213,7 +220,6 @@ class WebGPUDetector {
             });
 
             return this.device;
-
         } catch (error) {
             console.error('❌ Failed to create WebGPU device:', error);
             throw error;
@@ -222,7 +228,7 @@ class WebGPUDetector {
 
     /**
      * Format bytes to human-readable format
-     * @param {number} bytes 
+     * @param {number} bytes
      * @returns {string}
      */
     formatBytes(bytes) {
@@ -273,7 +279,9 @@ class WebGPUDetector {
             if (!isNaN(currentVersion) && currentVersion < minVersion) {
                 console.error(`⚠️  Your Firefox version (${version}) is too old`);
                 console.error(`   Minimum required: Firefox ${minVersion}+ (Nightly)`);
-                console.error(`   👉 Download Firefox Nightly: https://www.mozilla.org/firefox/nightly`);
+                console.error(
+                    `   👉 Download Firefox Nightly: https://www.mozilla.org/firefox/nightly`
+                );
             } else {
                 console.error('✅ Firefox Nightly should support WebGPU');
                 console.error('');
@@ -317,9 +325,11 @@ class WebGPUDetector {
             console.log(`📊 Adapter: ${result.adapter}`);
             console.log(`🏢 Vendor: ${result.vendor}`);
             console.log(`🏗️  Architecture: ${result.architecture}`);
-            console.log(`🔧 FP16 (shader-f16): ${result.fp16Available ? '✅ AVAILABLE' : '❌ NOT AVAILABLE'}`);
+            console.log(
+                `🔧 FP16 (shader-f16): ${result.fp16Available ? '✅ AVAILABLE' : '❌ NOT AVAILABLE'}`
+            );
             console.log(`\n📋 Available Features (${result.features.length}):`);
-            result.features.forEach(feature => {
+            result.features.forEach((feature) => {
                 const icon = feature === 'shader-f16' ? '🚀' : '  ';
                 console.log(`   ${icon} ${feature}`);
             });
@@ -348,7 +358,7 @@ class WebGPUDetector {
         const estimate = {
             tier: 'unknown',
             expectedLatency: 'unknown',
-            recommendations: []
+            recommendations: [],
         };
 
         if (!this.adapter) {
@@ -361,7 +371,8 @@ class WebGPUDetector {
         const hasFP16 = this.features.has('shader-f16');
         const maxBuffer = this.limits.maxBufferSize || 0;
 
-        if (hasFP16 && maxBuffer > 2 * 1024 * 1024 * 1024) { // > 2GB
+        if (hasFP16 && maxBuffer > 2 * 1024 * 1024 * 1024) {
+            // > 2GB
             estimate.tier = 'high';
             estimate.expectedLatency = '2-3s per frame';
             estimate.recommendations.push('✅ Optimal configuration detected');

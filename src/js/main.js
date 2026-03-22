@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * VLM Runtime - Main Entry
- * 
+ *
  * State machine architecture with formal transitions.
  * Separates view state from runtime state.
  */
@@ -21,6 +21,7 @@ import { createDiagnosticsPanel } from './components/diagnostics-panel.js';
 import { getStream, onStreamEnded, getCameraErrorMessage } from './services/webcam-service.js';
 import webgpuDetector from './utils/webgpu-detector.js';
 import logger from './utils/logger.js';
+import { VIEW_STATES, RUNTIME_STATES, LOADING_PHASES } from './types.js';
 
 // =============================
 // Early GPU Detection
@@ -57,13 +58,13 @@ async function detectWebGPU() {
 // =============================
 
 const stateMachine = new StateMachine({
-    viewState: 'welcome',
-    runtimeState: 'idle',
-    loadingPhase: 'loading-wgpu',
+    viewState: VIEW_STATES.WELCOME,
+    runtimeState: RUNTIME_STATES.IDLE,
+    loadingPhase: LOADING_PHASES.LOADING_WGPU,
     webcamStream: null,
     isVideoReady: false,
-    hasWebGPU: false,   // false until detectWebGPU() resolves
-    error: null
+    hasWebGPU: false, // false until detectWebGPU() resolves
+    error: null,
 });
 
 const root = document.getElementById('root');
@@ -71,7 +72,7 @@ const root = document.getElementById('root');
 // Persistent refs to avoid recreation
 let videoElement = null;
 let currentComponent = null;
-let currentStream = null;  // Prevents unnecessary srcObject reassignments
+let currentStream = null; // Prevents unnecessary srcObject reassignments
 let asciiBackground = null;
 let previousViewState = null; // Tracks last rendered view to skip redundant rebuilds
 
@@ -90,8 +91,8 @@ function createVideoElement() {
             attributes: {
                 autoplay: '',
                 muted: '',
-                playsinline: ''
-            }
+                playsinline: '',
+            },
         });
 
         // Nuclear option: instantly resume on any pause attempt
@@ -99,14 +100,18 @@ function createVideoElement() {
         // it works. don't touch.
         videoElement.addEventListener('pause', () => {
             if (videoElement.srcObject) {
-                videoElement.play().catch(err => console.error('Failed to resume video:', err));
+                videoElement.play().catch((err) => console.error('Failed to resume video:', err));
             }
         });
 
-        videoElement.addEventListener('canplay', () => {
-            stateMachine.setState({ isVideoReady: true });
-            videoElement.play().catch(err => console.error('Failed to play video:', err));
-        }, { once: true });
+        videoElement.addEventListener(
+            'canplay',
+            () => {
+                stateMachine.setState({ isVideoReady: true });
+                videoElement.play().catch((err) => console.error('Failed to play video:', err));
+            },
+            { once: true }
+        );
     }
 
     return videoElement;
@@ -118,15 +123,15 @@ function createVideoElement() {
  */
 function getVideoBlur(viewState) {
     const blurStates = {
-        'permission': 'blur(20px) brightness(0.2) saturate(0.5)',
-        'welcome': 'blur(12px) brightness(0.3) saturate(0.7)',
-        'loading': 'blur(8px) brightness(0.4) saturate(0.8)',
-        'runtime': 'none',
-        'error': 'blur(16px) brightness(0.2) saturate(0.5)',
-        'image-upload': 'blur(10px) brightness(0.3) saturate(0.6)'
+        [VIEW_STATES.PERMISSION]: 'blur(20px) brightness(0.2) saturate(0.5)',
+        [VIEW_STATES.WELCOME]: 'blur(12px) brightness(0.3) saturate(0.7)',
+        [VIEW_STATES.LOADING]: 'blur(8px) brightness(0.4) saturate(0.8)',
+        [VIEW_STATES.RUNTIME]: 'none',
+        [VIEW_STATES.ERROR]: 'blur(16px) brightness(0.2) saturate(0.5)',
+        [VIEW_STATES.IMAGE_UPLOAD]: 'blur(10px) brightness(0.3) saturate(0.6)',
     };
 
-    return blurStates[viewState] || blurStates['permission'];
+    return blurStates[viewState] || blurStates[VIEW_STATES.PERMISSION];
 }
 
 // =============================
@@ -147,9 +152,9 @@ function render(state) {
             performance.measure('App Boot Time', 'vlm:app-boot-start', 'vlm:app-ready');
             const bootMeasure = performance.getEntriesByName('App Boot Time').pop();
             if (bootMeasure && bootMeasure.duration > 0) {
-                console.log(`🚀 App Booted in ${(bootMeasure.duration).toFixed(2)}ms`);
+                console.log(`🚀 App Booted in ${bootMeasure.duration.toFixed(2)}ms`);
             }
-        } catch(e) {}
+        } catch (e) {}
     }
 
     // Always update video properties without rebuilding DOM
@@ -157,13 +162,15 @@ function render(state) {
         if (videoElement.srcObject !== webcamStream) {
             videoElement.srcObject = webcamStream;
             currentStream = webcamStream;
-            videoElement.play().catch(err => console.error('Failed to auto-play video:', err));
+            videoElement.play().catch((err) => console.error('Failed to auto-play video:', err));
         }
         videoElement.style.filter = getVideoBlur(viewState);
         videoElement.style.opacity = isVideoReady ? '1' : '0';
 
-        if (viewState === 'runtime' && isVideoReady && videoElement.paused) {
-            videoElement.play().catch(err => console.error('Failed to ensure video playback:', err));
+        if (viewState === VIEW_STATES.RUNTIME && isVideoReady && videoElement.paused) {
+            videoElement
+                .play()
+                .catch((err) => console.error('Failed to ensure video playback:', err));
         }
     }
 
@@ -175,7 +182,7 @@ function render(state) {
     previousViewState = viewState;
 
     // Toggle scroll for landing vs. fullscreen views
-    if (viewState === 'welcome') {
+    if (viewState === VIEW_STATES.WELCOME) {
         root.classList.add('landing-active');
         document.body.classList.add('landing-active');
         document.documentElement.classList.add('landing-active');
@@ -198,20 +205,23 @@ function render(state) {
 
     // Background layer always present
     const bgLayer = createElement('div', {
-        className: 'absolute inset-0 bg-gray-900'
+        className: 'absolute inset-0 bg-gray-900',
     });
 
     // Dark overlay for non-runtime screens (adds depth)
-    const overlay = viewState !== 'runtime' ? createElement('div', {
-        className: 'absolute inset-0 bg-overlay'
-    }) : null;
+    const overlay =
+        viewState !== VIEW_STATES.RUNTIME
+            ? createElement('div', {
+                  className: 'absolute inset-0 bg-overlay',
+              })
+            : null;
 
     // =============================
     // State Machine Rendering
     // =============================
 
     switch (viewState) {
-        case 'permission':
+        case VIEW_STATES.PERMISSION:
             currentComponent = createWebcamPermissionDialog(
                 (stream) => {
                     // Success - grant permission
@@ -222,13 +232,13 @@ function render(state) {
                     const errorInfo = getCameraErrorMessage(error);
                     stateMachine.dispatch('PERMISSION_DENIED', {
                         message: errorInfo.message,
-                        technical: errorInfo.technical
+                        technical: errorInfo.technical,
                     });
                 }
             );
             break;
 
-        case 'welcome':
+        case VIEW_STATES.WELCOME:
             currentComponent = createWelcomeScreen(() => {
                 // Read GPU support from the single source of truth
                 const { hasWebGPU } = stateMachine.getState();
@@ -241,7 +251,7 @@ function render(state) {
             });
             break;
 
-        case 'loading':
+        case VIEW_STATES.LOADING:
             currentComponent = createLoadingScreen(
                 // onPhaseChange
                 (event, data) => {
@@ -258,7 +268,7 @@ function render(state) {
             );
             break;
 
-        case 'runtime':
+        case VIEW_STATES.RUNTIME:
             // ASCII art background (6% opacity, totally optional but looks sick)
             if (videoElement && isVideoReady) {
                 asciiBackground = createAsciiBackground(videoElement);
@@ -268,11 +278,11 @@ function render(state) {
             currentComponent = createCaptioningView(videoElement);
             break;
 
-        case 'error':
+        case VIEW_STATES.ERROR:
             currentComponent = createErrorScreen(error);
             break;
 
-        case 'image-upload':
+        case VIEW_STATES.IMAGE_UPLOAD:
             // Fallback mode for devices without WebGPU
             currentComponent = createImageUpload(async (file) => {
                 try {
@@ -286,26 +296,28 @@ function render(state) {
                     // For now, just show a message
 
                     const resultOverlay = createElement('div', {
-                        className: 'fixed inset-0 bg-black/80 flex items-center justify-center z-[9999]'
+                        className:
+                            'fixed inset-0 bg-black/80 flex items-center justify-center z-[9999]',
                     });
 
                     const resultContent = createElement('div', {
-                        className: 'glass-container p-8 max-w-2xl mx-4'
+                        className: 'glass-container p-8 max-w-2xl mx-4',
                     });
 
                     const resultTitle = createElement('h3', {
                         className: 'text-2xl font-light mb-4',
-                        textContent: '❌ Not Supported Yet'
+                        textContent: '❌ Not Supported Yet',
                     });
 
                     const resultText = createElement('p', {
                         className: 'text-sm opacity-80 mb-6',
-                        textContent: 'Image upload analysis requires WebGPU support, which is not available on your device. This feature is planned for a future update using CPU/WASM inference.'
+                        textContent:
+                            'Image upload analysis requires WebGPU support, which is not available on your device. This feature is planned for a future update using CPU/WASM inference.',
                     });
 
                     const closeButton = createElement('button', {
                         className: 'glass-button px-6 py-3',
-                        textContent: 'Close'
+                        textContent: 'Close',
                     });
 
                     closeButton.addEventListener('click', () => {
@@ -319,7 +331,6 @@ function render(state) {
                     document.body.appendChild(resultOverlay);
 
                     logger.warn('Image upload not fully supported without WebGPU');
-
                 } catch (error) {
                     logger.error('Failed to process uploaded image', { error: error.message });
                     alert('Failed to process image: ' + error.message);
@@ -350,7 +361,7 @@ function render(state) {
         if (video.srcObject !== webcamStream) {
             video.srcObject = webcamStream;
             currentStream = webcamStream;
-            video.play().catch(err => console.error('Failed to auto-play video:', err));
+            video.play().catch((err) => console.error('Failed to auto-play video:', err));
         }
         video.style.filter = getVideoBlur(viewState);
         video.style.opacity = isVideoReady ? '1' : '0';
@@ -376,7 +387,7 @@ function render(state) {
 // because apparently "always connected" is too much to ask
 onStreamEnded((errorMessage) => {
     stateMachine.dispatch('STREAM_ENDED', {
-        reason: errorMessage || 'The camera was disconnected or access was revoked.'
+        reason: errorMessage || 'The camera was disconnected or access was revoked.',
     });
 });
 
@@ -419,7 +430,7 @@ document.addEventListener('keydown', (e) => {
 logger.info('Vision-Language Runtime initialized', {
     userAgent: navigator.userAgent,
     platform: navigator.platform,
-    language: navigator.language
+    language: navigator.language,
 });
 
 // Expose diagnostics panel globally for console access

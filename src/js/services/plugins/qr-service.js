@@ -19,7 +19,9 @@ export class QRCodeService {
 
         if ('BarcodeDetector' in window) {
             try {
-                this.barcodeDetector = new (/** @type {any} */(window).BarcodeDetector)({ formats: ['qr_code'] });
+                this.barcodeDetector = new /** @type {any} */ (window).BarcodeDetector({
+                    formats: ['qr_code'],
+                });
                 this.initialized = true;
                 console.log('✅ BarcodeDetector initialized for QR code detection');
             } catch (err) {
@@ -84,7 +86,7 @@ export class QRCodeService {
         return {
             initialized: this.initialized,
             available: this.isAvailable(),
-            apiSupported: 'BarcodeDetector' in window
+            apiSupported: 'BarcodeDetector' in window,
         };
     }
 }

@@ -13,15 +13,17 @@ export function createLiveCaption() {
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
     let isExpanded = !isMobile; // Collapsed by default on mobile
     let isPaused = false;
-    
+
     const container = createGlassContainer({
-        className: isMobile ? 'live-caption-bottom-sheet' : 'live-caption-container rounded-2xl shadow-2xl',
-        children: []
+        className: isMobile
+            ? 'live-caption-bottom-sheet'
+            : 'live-caption-container rounded-2xl shadow-2xl',
+        children: [],
     });
 
     // Header with controls
     const header = createElement('div', {
-        className: 'live-caption-header'
+        className: 'live-caption-header',
     });
 
     // Live indicator pill
@@ -29,38 +31,39 @@ export function createLiveCaption() {
         className: 'live-pill',
         children: [
             createElement('span', {
-                className: 'live-pill-dot'
+                className: 'live-pill-dot',
             }),
             createElement('span', {
                 className: 'live-pill-text',
-                text: 'Live'
-            })
-        ]
+                text: 'Live',
+            }),
+        ],
     });
 
     // Controls container
     const controls = createElement('div', {
-        className: 'caption-controls'
+        className: 'caption-controls',
     });
 
     // Copy button
     const copyBtn = createElement('button', {
         className: 'caption-control-btn',
         attributes: { 'aria-label': 'Copy caption' },
-        children: [
-            createElement('span', { text: '📋' })
-        ]
+        children: [createElement('span', { text: '📋' })],
     });
     copyBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const text = captionText.textContent;
         if (text && text !== PROMPTS.fallbackCaption) {
-            navigator.clipboard.writeText(text).then(() => {
-                copyBtn.innerHTML = '<span>✓</span>';
-                setTimeout(() => {
-                    copyBtn.innerHTML = '<span>📋</span>';
-                }, 1500);
-            }).catch(err => console.error('Failed to copy:', err));
+            navigator.clipboard
+                .writeText(text)
+                .then(() => {
+                    copyBtn.innerHTML = '<span>✓</span>';
+                    setTimeout(() => {
+                        copyBtn.innerHTML = '<span>📋</span>';
+                    }, 1500);
+                })
+                .catch((err) => console.error('Failed to copy:', err));
         }
     });
 
@@ -68,9 +71,7 @@ export function createLiveCaption() {
     const clearBtn = createElement('button', {
         className: 'caption-control-btn',
         attributes: { 'aria-label': 'Clear caption' },
-        children: [
-            createElement('span', { text: '🗑️' })
-        ]
+        children: [createElement('span', { text: '🗑️' })],
     });
     clearBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -82,9 +83,7 @@ export function createLiveCaption() {
     const pauseBtn = createElement('button', {
         className: 'caption-control-btn',
         attributes: { 'aria-label': 'Pause updates' },
-        children: [
-            createElement('span', { text: '⏸️' })
-        ]
+        children: [createElement('span', { text: '⏸️' })],
     });
     pauseBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -103,9 +102,7 @@ export function createLiveCaption() {
         editPromptBtn = createElement('button', {
             className: 'caption-control-btn',
             attributes: { 'aria-label': 'Edit prompt' },
-            children: [
-                createElement('span', { text: '✏️' })
-            ]
+            children: [createElement('span', { text: '✏️' })],
         });
         editPromptBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -118,11 +115,9 @@ export function createLiveCaption() {
     const chevron = createElement('button', {
         className: 'caption-chevron',
         attributes: { 'aria-label': 'Expand/collapse' },
-        children: [
-            createElement('span', { text: '▲' })
-        ]
+        children: [createElement('span', { text: '▲' })],
     });
-    
+
     controls.appendChild(copyBtn);
     controls.appendChild(clearBtn);
     controls.appendChild(pauseBtn);
@@ -138,12 +133,12 @@ export function createLiveCaption() {
 
     // Content area
     const content = createElement('div', {
-        className: 'live-caption-content'
+        className: 'live-caption-content',
     });
 
     const captionText = createElement('p', {
         className: 'live-caption-text',
-        text: PROMPTS.fallbackCaption
+        text: PROMPTS.fallbackCaption,
     });
 
     // URL container (added dynamically when URLs are detected)
@@ -158,7 +153,7 @@ export function createLiveCaption() {
     // Toggle expand/collapse on mobile
     const toggleExpand = () => {
         if (!isMobile) return;
-        
+
         isExpanded = !isExpanded;
         if (isExpanded) {
             addClass(container, 'expanded');
@@ -188,7 +183,7 @@ export function createLiveCaption() {
         window.visualViewport.addEventListener('resize', () => {
             const viewportHeight = window.visualViewport.height;
             const windowHeight = window.innerHeight;
-            
+
             // Keyboard is open if viewport is significantly smaller
             if (windowHeight - viewportHeight > 150) {
                 // Collapse when keyboard opens
@@ -202,28 +197,26 @@ export function createLiveCaption() {
     // Public methods
     container.updateCaption = (caption, isStreaming = false) => {
         if (isPaused) return; // Don't update if paused
-        
+
         // Remove existing URL container if present
         if (urlContainer) {
             urlContainer.remove();
             urlContainer = null;
         }
-        
+
         // Skip expensive URL detection regex during high-frequency streaming
         const rawText = caption || PROMPTS.fallbackCaption;
-        const processed = isStreaming 
-            ? { text: rawText, urls: [] } 
-            : processTextWithURLs(rawText);
-        
+        const processed = isStreaming ? { text: rawText, urls: [] } : processTextWithURLs(rawText);
+
         // Trigger fade-in animation by removing and re-adding
         captionText.style.animation = 'none';
         // Force reflow to restart animation
         void captionText.offsetHeight;
         captionText.style.animation = '';
-        
+
         // Set caption text (with URL placeholders)
         captionText.textContent = processed.text;
-        
+
         // Add URL component if URLs were detected
         if (processed.urls.length > 0) {
             logger.info('URLs detected in caption', { count: processed.urls.length });
@@ -246,7 +239,7 @@ export function createLiveCaption() {
 
     container.showError = (errorMessage) => {
         if (isPaused) return;
-        
+
         captionText.textContent = 'Error: ' + errorMessage;
         addClass(captionText, 'live-caption-error');
         removeClass(captionText, 'live-caption-streaming');

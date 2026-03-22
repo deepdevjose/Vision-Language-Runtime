@@ -1,9 +1,11 @@
 // @ts-check
 
+import { VIEW_STATES, RUNTIME_STATES } from '../../types.js';
+
 /**
  * Error domain transitions
  * Handles error states and recovery flows
- * 
+ *
  * Functions are bound to StateMachine context at initialization,
  * so 'this' refers to the StateMachine instance.
  * @see state-machine.js defineTransitions() for binding logic
@@ -19,50 +21,50 @@ export const errorTransitions = [
     {
         event: 'ERROR',
         from: '*',
-        to: 'error',
+        to: VIEW_STATES.ERROR,
         /** @this {import('../state-machine.js').default} */
-        action: function(data) {
+        action: function (data) {
             this.state.error = {
                 code: data?.code || 'UNKNOWN_COMPONENT_ERROR',
                 message: data?.message || 'Component failed unexpectedly',
                 technical: data?.technical,
                 recoverAction: {
                     label: 'Reload Application',
-                    handler: () => window.location.reload()
-                }
+                    handler: () => window.location.reload(),
+                },
             };
-        }
+        },
     },
 
     // Fatal error - can occur from any state
     {
         event: 'FATAL_ERROR',
         from: '*',
-        to: 'error',
+        to: VIEW_STATES.ERROR,
         /** @this {import('../state-machine.js').default} */
-        action: function(data) {
-            this.state.runtimeState = 'failed';
+        action: function (data) {
+            this.state.runtimeState = RUNTIME_STATES.FAILED;
             this.state.error = {
                 code: data?.code || 'FATAL_ERROR',
                 message: data?.message || 'A catastrophic error occurred',
                 technical: data?.technical,
                 recoverAction: data?.recoverAction || {
                     label: 'Reload Application',
-                    handler: () => window.location.reload()
-                }
+                    handler: () => window.location.reload(),
+                },
             };
-        }
+        },
     },
 
     // Recover from error state
     {
         event: 'RETRY',
-        from: 'error',
-        to: 'permission',
+        from: VIEW_STATES.ERROR,
+        to: VIEW_STATES.PERMISSION,
         /** @this {import('../state-machine.js').default} */
-        action: function() {
+        action: function () {
             this.state.error = null;
             this.state.runtimeState = 'idle';
-        }
-    }
+        },
+    },
 ];

@@ -20,12 +20,13 @@ export class TelemetryService {
     recordInferenceTime(elapsedTime) {
         this.lastInferenceTime = elapsedTime;
         this.inferenceHistory.push(elapsedTime);
-        
+
         if (this.inferenceHistory.length > this.maxHistorySize) {
             this.inferenceHistory.shift();
         }
-        
-        this.avgInferenceTime = this.inferenceHistory.reduce((a, b) => a + b, 0) / this.inferenceHistory.length;
+
+        this.avgInferenceTime =
+            this.inferenceHistory.reduce((a, b) => a + b, 0) / this.inferenceHistory.length;
     }
 
     /**
@@ -59,14 +60,14 @@ export class TelemetryService {
      */
     getDynamicFrameDelay(performanceTier) {
         const currentProfile = QOS_PROFILES[performanceTier] || QOS_PROFILES.high;
-        
+
         // Calculate optimal delay based on average inference time (add 20% breathing room buffer),
         // but never drop below the hardware profile's safety threshold ceiling.
         const recommendedDelay = Math.max(
             currentProfile.TIMING_DELAY_MS,
             this.avgInferenceTime * 1.2
         );
-        
+
         return recommendedDelay;
     }
 
@@ -135,7 +136,7 @@ export class TelemetryService {
             lastInferenceTime: this.lastInferenceTime,
             avgInferenceTime: this.avgInferenceTime,
             historySize: this.inferenceHistory.length,
-            historyValues: [...this.inferenceHistory]
+            historyValues: [...this.inferenceHistory],
         };
     }
 
@@ -145,7 +146,7 @@ export class TelemetryService {
      */
     getEstimatedFPS(performanceTier) {
         const delay = this.getDynamicFrameDelay(performanceTier);
-        return Math.round(1000 / delay * 100) / 100; // Round to 2 decimals
+        return Math.round((1000 / delay) * 100) / 100; // Round to 2 decimals
     }
 
     /**

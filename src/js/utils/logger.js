@@ -71,7 +71,7 @@ class Logger {
             level,
             message,
             timestamp: new Date().toISOString(),
-            ...(context && { context })
+            ...(context && { context }),
         };
 
         this.logs.push(entry);
@@ -86,14 +86,14 @@ class Logger {
             debug: 'color: #888; font-weight: normal',
             info: 'color: #00a8ff; font-weight: bold',
             warn: 'color: #ffa500; font-weight: bold',
-            error: 'color: #ff4444; font-weight: bold'
+            error: 'color: #ff4444; font-weight: bold',
         };
 
         const prefix = {
             debug: '🔍',
             info: 'ℹ️',
             warn: '⚠️',
-            error: '❌'
+            error: '❌',
         };
 
         console[level === 'debug' ? 'log' : level](
@@ -148,9 +148,7 @@ class Logger {
         if (!filterLevel) return [...this.logs];
 
         const minPriority = this.getLevelPriority(filterLevel);
-        return this.logs.filter(log => 
-            this.getLevelPriority(log.level) >= minPriority
-        );
+        return this.logs.filter((log) => this.getLevelPriority(log.level) >= minPriority);
     }
 
     /**
@@ -197,10 +195,10 @@ class Logger {
             debug: 0,
             info: 0,
             warn: 0,
-            error: 0
+            error: 0,
         };
 
-        this.logs.forEach(log => {
+        this.logs.forEach((log) => {
             stats[log.level]++;
         });
 

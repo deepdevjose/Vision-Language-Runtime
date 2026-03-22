@@ -40,19 +40,25 @@ export function createCaptioningView(videoElement) {
     const captionPill = createElement('div', { className: 'rt-caption-pill' });
     let captionFadeTimer = null;
 
-    const pauseBtn = createElement('button', { className: 'rt-overlay-btn', attributes: { title: 'Pause' } });
-    pauseBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>';
+    const pauseBtn = createElement('button', {
+        className: 'rt-overlay-btn',
+        attributes: { title: 'Pause' },
+    });
+    pauseBtn.innerHTML =
+        '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>';
     pauseBtn.addEventListener('click', function () {
         isRunningState = !isRunningState;
         isRunning = isRunningState;
         if (!isRunning) {
             abortController && abortController.abort();
             abortController = null;
-            pauseBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+            pauseBtn.innerHTML =
+                '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
             pauseBtn.title = 'Resume';
             livePill.querySelector('.rt-live-dot').classList.add('paused');
         } else {
-            pauseBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>';
+            pauseBtn.innerHTML =
+                '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>';
             pauseBtn.title = 'Pause';
             livePill.querySelector('.rt-live-dot').classList.remove('paused');
             startCaptioningLoop();
@@ -62,8 +68,12 @@ export function createCaptioningView(videoElement) {
     overlay.appendChild(livePill);
     const overlayRight = createElement('div', { className: 'rt-overlay-right' });
 
-    const snapshotBtn = createElement('button', { className: 'rt-overlay-btn rt-snapshot-labeled', attributes: { title: 'Save snapshot' } });
-    snapshotBtn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M9 2L7.17 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2h-3.17L15 2H9zm3 15a5 5 0 110-10 5 5 0 010 10z"/></svg><span>Snapshot</span>';
+    const snapshotBtn = createElement('button', {
+        className: 'rt-overlay-btn rt-snapshot-labeled',
+        attributes: { title: 'Save snapshot' },
+    });
+    snapshotBtn.innerHTML =
+        '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M9 2L7.17 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2h-3.17L15 2H9zm3 15a5 5 0 110-10 5 5 0 010 10z"/></svg><span>Snapshot</span>';
     snapshotBtn.addEventListener('click', function () {
         if (!videoElement) return;
         try {
@@ -80,14 +90,15 @@ export function createCaptioningView(videoElement) {
                 a.click();
                 URL.revokeObjectURL(url);
             }, 'image/png');
-        } catch (e) { 
-            // empty catch 
+        } catch (e) {
+            // empty catch
         }
     });
 
     // ── Camera switcher (only visible when >1 camera) ─────────
     const cameraSwitcher = createElement('div', { className: 'rt-camera-switcher' });
-    cameraSwitcher.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"/></svg>';
+    cameraSwitcher.innerHTML =
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z"/></svg>';
     const cameraSelect = createElement('select', { className: 'rt-camera-select' });
     cameraSwitcher.appendChild(cameraSelect);
 
@@ -97,7 +108,7 @@ export function createCaptioningView(videoElement) {
         cameras.forEach(function (cam, i) {
             var opt = document.createElement('option');
             opt.value = cam.deviceId;
-            opt.textContent = cam.label || ('Camera ' + (i + 1));
+            opt.textContent = cam.label || 'Camera ' + (i + 1);
             cameraSelect.appendChild(opt);
         });
         // Show switcher only if >1 camera
@@ -128,7 +139,9 @@ export function createCaptioningView(videoElement) {
     });
 
     // Listen for camera connect/disconnect
-    function onDeviceChange() { populateCameras(); }
+    function onDeviceChange() {
+        populateCameras();
+    }
     navigator.mediaDevices.addEventListener('devicechange', onDeviceChange);
 
     // Populate on mount (after short delay for Safari label quirks)
@@ -150,7 +163,7 @@ export function createCaptioningView(videoElement) {
     const promptBar = createElement('div', { className: 'rt-prompt-bar' });
     const promptInput = createElement('textarea', {
         className: 'rt-prompt-input',
-        attributes: { placeholder: 'Ask something about what you see\u2026', rows: '1' }
+        attributes: { placeholder: 'Ask something about what you see\u2026', rows: '1' },
     });
     promptInput.value = PROMPTS.default;
 
@@ -169,8 +182,12 @@ export function createCaptioningView(videoElement) {
         }
     });
 
-    const sendBtn = createElement('button', { className: 'rt-send-btn', attributes: { title: 'Send' } });
-    sendBtn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
+    const sendBtn = createElement('button', {
+        className: 'rt-send-btn',
+        attributes: { title: 'Send' },
+    });
+    sendBtn.innerHTML =
+        '<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
     sendBtn.addEventListener('click', sendPrompt);
 
     promptBar.appendChild(promptInput);
@@ -207,18 +224,30 @@ export function createCaptioningView(videoElement) {
     const outputActions = createElement('div', { className: 'rt-output-actions' });
     const historyBadge = createElement('span', { className: 'rt-history-badge' });
 
-    const copyBtn = createElement('button', { className: 'rt-action-btn', attributes: { title: 'Copy response' } });
-    copyBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+    const copyBtn = createElement('button', {
+        className: 'rt-action-btn',
+        attributes: { title: 'Copy response' },
+    });
+    copyBtn.innerHTML =
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
     copyBtn.addEventListener('click', function () {
         if (outputHistory.length > 0) {
-            navigator.clipboard.writeText(outputHistory[outputHistory.length - 1]).catch(function () { });
+            navigator.clipboard
+                .writeText(outputHistory[outputHistory.length - 1])
+                .catch(function () {});
             copyBtn.querySelector('span').textContent = 'Copied!';
-            setTimeout(function () { copyBtn.querySelector('span').textContent = 'Copy'; }, 1500);
+            setTimeout(function () {
+                copyBtn.querySelector('span').textContent = 'Copy';
+            }, 1500);
         }
     });
 
-    const settingsBtn = createElement('button', { className: 'rt-action-btn', attributes: { title: 'Settings' } });
-    settingsBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M2 12h2m16 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg><span>Settings</span>';
+    const settingsBtn = createElement('button', {
+        className: 'rt-action-btn',
+        attributes: { title: 'Settings' },
+    });
+    settingsBtn.innerHTML =
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2M4.22 4.22l1.42 1.42m12.72 12.72 1.42 1.42M2 12h2m16 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg><span>Settings</span>';
 
     outputActions.appendChild(copyBtn);
     outputActions.appendChild(settingsBtn);
@@ -228,18 +257,28 @@ export function createCaptioningView(videoElement) {
 
     // Settings panel (hidden)
     const settingsPanel = createElement('div', { className: 'rt-settings hidden' });
-    settingsPanel.innerHTML = '<div class="rt-settings-row"><span>Model</span><span>FastVLM-0.5B</span></div>'
-        + '<div class="rt-settings-row"><span>Backend</span><span>WebGPU</span></div>'
-        + '<div class="rt-settings-row"><span>Max tokens</span><span>' + MODEL_CONFIG.MAX_NEW_TOKENS + '</span></div>'
-        + '<div class="rt-settings-row"><span>Frame delay</span><span>Dynamic</span></div>';
+    settingsPanel.innerHTML =
+        '<div class="rt-settings-row"><span>Model</span><span>FastVLM-0.5B</span></div>' +
+        '<div class="rt-settings-row"><span>Backend</span><span>WebGPU</span></div>' +
+        '<div class="rt-settings-row"><span>Max tokens</span><span>' +
+        MODEL_CONFIG.MAX_NEW_TOKENS +
+        '</span></div>' +
+        '<div class="rt-settings-row"><span>Frame delay</span><span>Dynamic</span></div>';
     settingsBtn.addEventListener('click', function () {
         settingsPanel.classList.toggle('hidden');
     });
 
     const outputTextContainer = createElement('div', { className: 'rt-output-text-container' });
-    const outputText = createElement('div', { className: 'rt-output-text', text: 'Waiting for first response\u2026' });
+    const outputText = createElement('div', {
+        className: 'rt-output-text',
+        text: 'Waiting for first response\u2026',
+    });
     const outputCursor = createElement('span', { className: 'rt-cursor', text: '\u258c' });
-    const expandBtn = createElement('button', { className: 'rt-expand-btn', text: '[expand]', attributes: { style: 'display: none;' } });
+    const expandBtn = createElement('button', {
+        className: 'rt-expand-btn',
+        text: '[expand]',
+        attributes: { style: 'display: none;' },
+    });
 
     let isExpanded = false;
     expandBtn.addEventListener('click', () => {
@@ -291,13 +330,17 @@ export function createCaptioningView(videoElement) {
 
     function setThinking(steps, streamingText) {
         outputCursor.style.display = '';
-        var html = steps.map(function (s, i) {
-            var isActive = i === steps.length - 1;
-            var cls = isActive ? ' active' : ' done';
-            var prefix = isActive ? '' : '\u2713 ';
-            var dots = isActive ? ' <span class="rt-dots-anim"><span></span><span></span><span></span></span>' : '';
-            return '<span class="rt-thinking-step' + cls + '">' + prefix + s + dots + '</span>';
-        }).join('');
+        var html = steps
+            .map(function (s, i) {
+                var isActive = i === steps.length - 1;
+                var cls = isActive ? ' active' : ' done';
+                var prefix = isActive ? '' : '\u2713 ';
+                var dots = isActive
+                    ? ' <span class="rt-dots-anim"><span></span><span></span><span></span></span>'
+                    : '';
+                return '<span class="rt-thinking-step' + cls + '">' + prefix + s + dots + '</span>';
+            })
+            .join('');
         // Trusted HTML: thinking-step structure with animations
         outputText.innerHTML = html;
         // Untrusted model output: use textContent to prevent DOM corruption
@@ -315,7 +358,8 @@ export function createCaptioningView(videoElement) {
             isRunning = true;
             isRunningState = true;
             livePill.querySelector('.rt-live-dot').classList.remove('paused');
-            pauseBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>';
+            pauseBtn.innerHTML =
+                '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>';
             startCaptioningLoop();
         }
     }
@@ -339,9 +383,9 @@ export function createCaptioningView(videoElement) {
         const loop = async () => {
             while (!signal.aborted && isRunning) {
                 if (videoElement && videoElement.readyState >= 2 && videoElement.videoWidth > 0) {
-                    if (videoElement.paused) await videoElement.play().catch(() => { });
+                    if (videoElement.paused) await videoElement.play().catch(() => {});
                     if (vlmService.inferenceLock) {
-                        await sleep(500, signal).catch(() => { });
+                        await sleep(500, signal).catch(() => {});
                         continue;
                     }
                     try {
@@ -355,10 +399,17 @@ export function createCaptioningView(videoElement) {
                             currentPrompt,
                             (streamedText) => {
                                 if (streamSteps.length === 1) {
-                                    streamSteps = ['Capturing frame\u2026', 'Analyzing image\u2026'];
+                                    streamSteps = [
+                                        'Capturing frame\u2026',
+                                        'Analyzing image\u2026',
+                                    ];
                                 }
                                 if (streamedText.length > 15 && streamSteps.length < 3) {
-                                    streamSteps = ['Capturing frame\u2026', 'Analyzing image\u2026', 'Generating response\u2026'];
+                                    streamSteps = [
+                                        'Capturing frame\u2026',
+                                        'Analyzing image\u2026',
+                                        'Generating response\u2026',
+                                    ];
                                 }
                                 outputText.className = 'rt-output-text';
                                 expandBtn.style.display = 'none';
@@ -370,7 +421,9 @@ export function createCaptioningView(videoElement) {
                         if (result && !signal.aborted) {
                             const clean = postProcessCaption(result);
                             outputHistory.push(clean);
-                            historyBadge.textContent = outputHistory.length + (outputHistory.length === 1 ? ' response' : ' responses');
+                            historyBadge.textContent =
+                                outputHistory.length +
+                                (outputHistory.length === 1 ? ' response' : ' responses');
                             outputText.textContent = clean;
                             outputText.className = 'rt-output-text ready';
                             outputCursor.style.display = 'none';
@@ -383,18 +436,18 @@ export function createCaptioningView(videoElement) {
                             setStatus();
                         }
                         if (!signal.aborted) {
-                            await sleep(vlmService.getDynamicFrameDelay(), signal).catch(() => { });
+                            await sleep(vlmService.getDynamicFrameDelay(), signal).catch(() => {});
                         }
                     } catch (error) {
                         if (!signal.aborted) {
                             setStatus('Error', true);
                             outputText.textContent = error.message;
                             outputCursor.style.display = 'none';
-                            await sleep(2000, signal).catch(() => { });
+                            await sleep(2000, signal).catch(() => {});
                         }
                     }
                 } else {
-                    await sleep(100, signal).catch(() => { });
+                    await sleep(100, signal).catch(() => {});
                 }
                 if (signal.aborted) break;
             }

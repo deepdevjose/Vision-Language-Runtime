@@ -4,7 +4,11 @@
  */
 
 // @ts-ignore
-import { AutoProcessor, AutoModelForImageTextToText, TextStreamer } from '@huggingface/transformers';
+import {
+    AutoProcessor,
+    AutoModelForImageTextToText,
+    TextStreamer,
+} from '@huggingface/transformers';
 import { MODEL_CONFIG, QOS_PROFILES } from '../utils/constants.js';
 import webgpuDetector from '../utils/webgpu-detector.js';
 
@@ -41,7 +45,7 @@ export class CoreInference {
             try {
                 performance.mark('vlm:model-load-start');
                 onProgress?.('Detecting GPU capabilities...', 5);
-                
+
                 const gpuInfo = await webgpuDetector.detect();
                 if (!gpuInfo.supported) {
                     throw new Error('WebGPU not supported on this device/browser');
@@ -49,11 +53,13 @@ export class CoreInference {
 
                 const perfEstimate = webgpuDetector.getPerformanceEstimate();
                 this.performanceTier = perfEstimate.tier;
-                
-                console.log(`⚡ Detected Hardware Tier: ${this.performanceTier.toUpperCase()} tier (${perfEstimate.expectedLatency})`);
+
+                console.log(
+                    `⚡ Detected Hardware Tier: ${this.performanceTier.toUpperCase()} tier (${perfEstimate.expectedLatency})`
+                );
                 if (perfEstimate.recommendations.length > 0) {
                     console.log('💡 Recommendations:');
-                    perfEstimate.recommendations.forEach(rec => console.log(`   ${rec}`));
+                    perfEstimate.recommendations.forEach((rec) => console.log(`   ${rec}`));
                 }
 
                 onProgress?.('Loading processor...', 10);
@@ -61,27 +67,35 @@ export class CoreInference {
                 performance.mark('vlm:processor-loaded');
 
                 onProgress?.('Processor loaded. Loading model...', 20);
-                this.model = await AutoModelForImageTextToText.from_pretrained(MODEL_CONFIG.MODEL_ID, {
-                    dtype: {
-                        embed_tokens: 'fp16',
-                        vision_encoder: 'q4',
-                        decoder_model_merged: 'q4'
-                    },
-                    device: 'webgpu',
-                    progress_callback: (data) => {
-                        if (data.status === 'progress') {
-                            const fileName = data.file || 'unknown';
-                            const progress = data.progress || 0;
+                this.model = await AutoModelForImageTextToText.from_pretrained(
+                    MODEL_CONFIG.MODEL_ID,
+                    {
+                        dtype: {
+                            embed_tokens: 'fp16',
+                            vision_encoder: 'q4',
+                            decoder_model_merged: 'q4',
+                        },
+                        device: 'webgpu',
+                        progress_callback: (data) => {
+                            if (data.status === 'progress') {
+                                const fileName = data.file || 'unknown';
+                                const progress = data.progress || 0;
 
-                            fileProgress.set(fileName, progress);
-                            const progressValues = Array.from(fileProgress.values());
-                            const avgProgress = progressValues.reduce((a, b) => a + b, 0) / progressValues.length;
-                            const overallPercent = Math.round(avgProgress);
+                                fileProgress.set(fileName, progress);
+                                const progressValues = Array.from(fileProgress.values());
+                                const avgProgress =
+                                    progressValues.reduce((a, b) => a + b, 0) /
+                                    progressValues.length;
+                                const overallPercent = Math.round(avgProgress);
 
-                            onProgress?.(`Downloading model files... (${fileProgress.size} files)`, 20 + (overallPercent * 0.6));
-                        }
+                                onProgress?.(
+                                    `Downloading model files... (${fileProgress.size} files)`,
+                                    20 + overallPercent * 0.6
+                                );
+                            }
+                        },
                     }
-                });
+                );
 
                 onProgress?.('Model loaded successfully!', 80);
                 this.isLoaded = true;
@@ -91,17 +105,31 @@ export class CoreInference {
                 await this.performWarmup();
                 onProgress?.('Warmup complete!', 95);
                 performance.mark('vlm:model-load-end');
-                
+
                 try {
-                    performance.measure('Model Load Total', 'vlm:model-load-start', 'vlm:model-load-end');
-                    performance.measure('Processor Load', 'vlm:model-load-start', 'vlm:processor-loaded');
-                    performance.measure('Weights Download/Load', 'vlm:processor-loaded', 'vlm:model-weights-loaded');
-                    
+                    performance.measure(
+                        'Model Load Total',
+                        'vlm:model-load-start',
+                        'vlm:model-load-end'
+                    );
+                    performance.measure(
+                        'Processor Load',
+                        'vlm:model-load-start',
+                        'vlm:processor-loaded'
+                    );
+                    performance.measure(
+                        'Weights Download/Load',
+                        'vlm:processor-loaded',
+                        'vlm:model-weights-loaded'
+                    );
+
                     if (MODEL_CONFIG.DEBUG) {
                         const totalMatch = performance.getEntriesByName('Model Load Total').pop();
-                        console.log(`⏱️ Total Model Load: ${(totalMatch.duration / 1000).toFixed(2)}s`);
+                        console.log(
+                            `⏱️ Total Model Load: ${(totalMatch.duration / 1000).toFixed(2)}s`
+                        );
                     }
-                } catch(e) {}
+                } catch (e) {}
             } catch (error) {
                 console.error('Error loading model:', error);
                 throw error;
@@ -130,13 +158,23 @@ export class CoreInference {
             ctx.fillStyle = '#808080';
             ctx.fillRect(0, 0, 320, 240);
 
-            const dummyPrompt = 'Describe this.';
+            // Format warmup prompt using proper chat template (matching inference flow)
+            const currentProfile = QOS_PROFILES[this.performanceTier] || QOS_PROFILES.high;
+            const warmupMessages = [
+                { role: 'system', content: currentProfile.SYSTEM_PROMPT },
+                { role: 'user', content: '<image>Describe this image briefly.' },
+            ];
+            const warmupPrompt = this.processor.apply_chat_template(warmupMessages, {
+                add_generation_prompt: true,
+            });
 
             for (let i = 0; i < 2; i++) {
                 const startTime = performance.now();
-                await this.runModelGenerate(warmupCanvas, dummyPrompt, null, true);
+                await this.runModelGenerate(warmupCanvas, warmupPrompt, null, true);
                 const elapsed = performance.now() - startTime;
-                console.log(`🔥 Warmup inference ${i + 1}/2 completed in ${(elapsed / 1000).toFixed(2)}s`);
+                console.log(
+                    `🔥 Warmup inference ${i + 1}/2 completed in ${(elapsed / 1000).toFixed(2)}s`
+                );
             }
 
             this.warmedUp = true;
@@ -161,21 +199,21 @@ export class CoreInference {
 
         const { RawImage } = await import('@huggingface/transformers');
         const frame = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
-        
+
         const rawImage = new RawImage(frame.data, frame.width, frame.height, 4);
 
         const inputs = await this.processor(rawImage, prompt, {
-            add_special_tokens: false
+            add_special_tokens: false,
         });
 
         if (MODEL_CONFIG.DEBUG) console.log('🤖 Running model inference...');
-        
+
         const currentProfile = QOS_PROFILES[this.performanceTier] || QOS_PROFILES.high;
         const maxTokens = currentProfile.MAX_NEW_TOKENS;
 
         let streamed = '';
         let tokenCount = 0;
-        
+
         const streamer = new TextStreamer(this.processor.tokenizer, {
             skip_prompt: true,
             skip_special_tokens: true,
@@ -186,7 +224,7 @@ export class CoreInference {
                     console.log(`📤 Streaming... (${tokenCount} tokens)`);
                 }
                 onTextUpdate?.(streamed.trim());
-            }
+            },
         });
 
         performance.mark('vlm:model-execution-start');
@@ -196,7 +234,7 @@ export class CoreInference {
             max_new_tokens: maxTokens,
             do_sample: false,
             streamer,
-            repetition_penalty: 1.2
+            repetition_penalty: 1.2,
         });
 
         performance.mark('vlm:model-execution-end');
@@ -204,14 +242,21 @@ export class CoreInference {
         if (MODEL_CONFIG.DEBUG && !isWarmup) {
             console.log(`✅ Model output generated (${maxTokens} max tokens)`);
             try {
-                performance.measure('Model Execution', 'vlm:model-execution-start', 'vlm:model-execution-end');
-            } catch(e) {}
+                performance.measure(
+                    'Model Execution',
+                    'vlm:model-execution-start',
+                    'vlm:model-execution-end'
+                );
+            } catch (e) {}
         }
 
-        const finalText = streamed.trim() || this.processor.batch_decode(
-            outputs.slice(null, [inputs.input_ids.dims.at(-1), null]),
-            { skip_special_tokens: true }
-        )[0].trim();
+        const finalText =
+            streamed.trim() ||
+            this.processor
+                .batch_decode(outputs.slice(null, [inputs.input_ids.dims.at(-1), null]), {
+                    skip_special_tokens: true,
+                })[0]
+                .trim();
 
         if (MODEL_CONFIG.DEBUG && !isWarmup) console.log('💬 Final caption:', finalText);
 
@@ -251,7 +296,7 @@ export class CoreInference {
         return {
             isLoaded: this.isLoaded,
             isLoading: this.isLoading,
-            warmedUp: this.warmedUp
+            warmedUp: this.warmedUp,
         };
     }
 

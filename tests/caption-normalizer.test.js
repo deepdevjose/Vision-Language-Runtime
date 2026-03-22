@@ -97,7 +97,7 @@ async function runTests() {
 }
 
 if (typeof process !== 'undefined') {
-    runTests().then(results => {
+    runTests().then((results) => {
         process.exit(results.failed > 0 ? 1 : 0);
     });
 }

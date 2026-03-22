@@ -17,13 +17,13 @@ export function createFreezeFrame(onFreeze, onUnfreeze) {
         children: [
             createElement('span', {
                 className: 'freeze-icon',
-                text: '📸'
+                text: '📸',
             }),
             createElement('span', {
                 className: 'freeze-text ml-2',
-                text: 'Freeze'
-            })
-        ]
+                text: 'Freeze',
+            }),
+        ],
     });
 
     // Handle freeze/unfreeze
@@ -38,7 +38,7 @@ export function createFreezeFrame(onFreeze, onUnfreeze) {
     function freeze() {
         isFrozen = true;
         frozenImageData = null;
-        
+
         // Update button UI
         const icon = freezeButton.querySelector('.freeze-icon');
         const text = freezeButton.querySelector('.freeze-text');
@@ -52,7 +52,7 @@ export function createFreezeFrame(onFreeze, onUnfreeze) {
     function unfreeze() {
         isFrozen = false;
         frozenImageData = null;
-        
+
         // Update button UI
         const icon = freezeButton.querySelector('.freeze-icon');
         const text = freezeButton.querySelector('.freeze-text');
@@ -78,6 +78,6 @@ export function createFreezeFrame(onFreeze, onUnfreeze) {
         freeze,
         unfreeze,
         setFrozenFrame,
-        getFrozenFrame
+        getFrozenFrame,
     };
 }

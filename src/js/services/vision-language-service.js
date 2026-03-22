@@ -78,7 +78,11 @@ class VLMService {
             }
 
             // Step 3: Prepare processing inputs
-            const messages = this.imageProcessor.prepareChatMessages(instruction, performanceTier, qrContext);
+            const messages = this.imageProcessor.prepareChatMessages(
+                instruction,
+                performanceTier,
+                qrContext
+            );
             const processor = this.coreInference.getProcessor();
             const prompt = this.imageProcessor.preparePrompt(
                 processor.apply_chat_template.bind(processor),
@@ -87,7 +91,12 @@ class VLMService {
 
             // Step 4: Run model inference
             performance.mark('vlm:post-processing-start');
-            const result = await this.coreInference.runModelGenerate(canvas, prompt, onTextUpdate, false);
+            const result = await this.coreInference.runModelGenerate(
+                canvas,
+                prompt,
+                onTextUpdate,
+                false
+            );
             performance.mark('vlm:inference-end');
 
             // Step 5: Record telemetry
@@ -95,9 +104,17 @@ class VLMService {
             this.telemetry.recordInferenceTime(elapsedTime);
 
             try {
-                this.telemetry.measure('Total Inference', 'vlm:inference-start', 'vlm:inference-end');
-                this.telemetry.measure('Image Processing', 'vlm:post-processing-start', 'vlm:model-execution-start');
-            } catch(e) {}
+                this.telemetry.measure(
+                    'Total Inference',
+                    'vlm:inference-start',
+                    'vlm:inference-end'
+                );
+                this.telemetry.measure(
+                    'Image Processing',
+                    'vlm:post-processing-start',
+                    'vlm:model-execution-start'
+                );
+            } catch (e) {}
 
             return result;
         } catch (error) {
@@ -121,14 +138,14 @@ class VLMService {
     getLoadedState() {
         const coreState = this.coreInference.getLoadedState();
         const telemetryData = this.telemetry.getTelemetrySummary();
-        
+
         return {
             isLoaded: coreState.isLoaded,
             isLoading: coreState.isLoading,
             warmedUp: coreState.warmedUp,
             avgInferenceTime: telemetryData.avgInferenceTime,
             lastInferenceTime: telemetryData.lastInferenceTime,
-            performanceTier: this.coreInference.getPerformanceTier()
+            performanceTier: this.coreInference.getPerformanceTier(),
         };
     }
 

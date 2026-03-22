@@ -17,19 +17,29 @@ class MockElement {
         this._children = [];
         this._attributes = {};
     }
-    setAttribute(k, v) { this._attributes[k] = v; }
-    getAttribute(k) { return this._attributes[k]; }
-    appendChild(child) { this._children.push(child); return child; }
+    setAttribute(k, v) {
+        this._attributes[k] = v;
+    }
+    getAttribute(k) {
+        return this._attributes[k];
+    }
+    appendChild(child) {
+        this._children.push(child);
+        return child;
+    }
 }
 
 class MockTextNode {
-    constructor(text) { this.textContent = text; this.nodeType = 3; }
+    constructor(text) {
+        this.textContent = text;
+        this.nodeType = 3;
+    }
 }
 
 // Patch globals so createElement import works
 globalThis.document = {
     createElement: (tag) => new MockElement(tag),
-    createTextNode: (text) => new MockTextNode(text)
+    createTextNode: (text) => new MockTextNode(text),
 };
 globalThis.Node = MockElement;
 
@@ -41,14 +51,20 @@ const tests = [];
 let passed = 0;
 let failed = 0;
 
-function test(name, fn) { tests.push({ name, fn }); }
+function test(name, fn) {
+    tests.push({ name, fn });
+}
 
 function assertEqual(actual, expected, msg) {
     if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-        throw new Error(`${msg}\nExpected: ${JSON.stringify(expected)}\nActual:   ${JSON.stringify(actual)}`);
+        throw new Error(
+            `${msg}\nExpected: ${JSON.stringify(expected)}\nActual:   ${JSON.stringify(actual)}`
+        );
     }
 }
-function assertTrue(v, msg) { if (!v) throw new Error(msg || 'Expected true'); }
+function assertTrue(v, msg) {
+    if (!v) throw new Error(msg || 'Expected true');
+}
 
 // ================================================================
 // Tests
@@ -99,7 +115,7 @@ test('checked and disabled are set as DOM properties', () => {
 
 test('attributes map uses setAttribute', () => {
     const el = createElement('div', {
-        attributes: { 'data-id': '42', 'aria-label': 'test' }
+        attributes: { 'data-id': '42', 'aria-label': 'test' },
     });
     assertEqual(el.getAttribute('data-id'), '42', 'data-id');
     assertEqual(el.getAttribute('aria-label'), 'test', 'aria-label');
@@ -114,7 +130,7 @@ test('style is merged via Object.assign', () => {
 test('children array appends nodes and strings', () => {
     const child = createElement('span', { text: 'inner' });
     const el = createElement('div', {
-        children: [child, 'text-node']
+        children: [child, 'text-node'],
     });
     assertEqual(el._children.length, 2, 'should have 2 children');
     assertEqual(el._children[0].tagName, 'SPAN', 'first child is span');
@@ -122,7 +138,7 @@ test('children array appends nodes and strings', () => {
 });
 
 test('unknown keys fall through to setAttribute', () => {
-    const el = createElement('div', { 'data-custom': 'value', 'role': 'button' });
+    const el = createElement('div', { 'data-custom': 'value', role: 'button' });
     assertEqual(el.getAttribute('data-custom'), 'value', 'data-custom via setAttribute');
     assertEqual(el.getAttribute('role'), 'button', 'role via setAttribute');
 });
@@ -132,7 +148,7 @@ test('combined options work together (real-world image-upload)', () => {
         type: 'file',
         accept: 'image/*',
         className: 'hidden',
-        id: 'file-input'
+        id: 'file-input',
     });
     assertEqual(el.tagName, 'INPUT', 'tag');
     assertEqual(el.type, 'file', 'type');
@@ -171,7 +187,7 @@ async function runTests() {
 }
 
 if (typeof process !== 'undefined') {
-    runTests().then(results => {
+    runTests().then((results) => {
         process.exit(results.failed > 0 ? 1 : 0);
     });
 }

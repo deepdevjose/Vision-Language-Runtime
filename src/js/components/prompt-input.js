@@ -11,34 +11,36 @@ export function createPromptInput(onPromptChange, onFocusChange) {
     let isExpanded = false; // Collapsed by default on mobile
 
     const container = createGlassContainer({
-        className: isMobile ? 'prompt-input-bottom-sheet' : 'prompt-input-container rounded-2xl shadow-2xl',
-        children: []
+        className: isMobile
+            ? 'prompt-input-bottom-sheet'
+            : 'prompt-input-container rounded-2xl shadow-2xl',
+        children: [],
     });
 
     // Mobile: Header with handle and collapse button
     let header;
     if (isMobile) {
         header = createElement('div', {
-            className: 'prompt-input-header'
+            className: 'prompt-input-header',
         });
 
         const handle = createElement('div', {
-            className: 'prompt-handle'
+            className: 'prompt-handle',
         });
 
         const titleRow = createElement('div', {
-            className: 'prompt-title-row'
+            className: 'prompt-title-row',
         });
 
         const title = createElement('span', {
             className: 'prompt-title-text',
-            text: 'Prompt'
+            text: 'Prompt',
         });
 
         const chevron = createElement('button', {
             className: 'prompt-chevron',
             attributes: { 'aria-label': 'Expand/collapse' },
-            children: [createElement('span', { text: '▲' })]
+            children: [createElement('span', { text: '▲' })],
         });
 
         titleRow.appendChild(title);
@@ -48,21 +50,21 @@ export function createPromptInput(onPromptChange, onFocusChange) {
     }
 
     const content = createElement('div', {
-        className: isMobile ? 'prompt-input-content' : 'p-4'
+        className: isMobile ? 'prompt-input-content' : 'p-4',
     });
 
     const label = createElement('label', {
         className: 'text-sm font-semibold text-gray-200 mb-2',
         text: 'Prompt:',
-        style: { display: isMobile ? 'none' : 'block' }
+        style: { display: isMobile ? 'none' : 'block' },
     });
 
     const textarea = createElement('textarea', {
         className: 'prompt-textarea',
         attributes: {
             placeholder: PROMPTS.placeholder,
-            rows: isMobile ? '2' : '3'
-        }
+            rows: isMobile ? '2' : '3',
+        },
     });
 
     textarea.value = PROMPTS.default;
@@ -98,18 +100,18 @@ export function createPromptInput(onPromptChange, onFocusChange) {
     const presetsLabel = createElement('p', {
         className: 'text-sm text-gray-400 mt-3 mb-2 font-semibold',
         text: 'Quick Presets:',
-        style: { display: isMobile ? 'none' : 'block' }
+        style: { display: isMobile ? 'none' : 'block' },
     });
 
     const presetsContainer = createElement('div', {
-        className: 'prompt-suggestions'
+        className: 'prompt-suggestions',
     });
 
     // Add preset chips
     Object.entries(PROMPTS.presets || {}).forEach(([label, prompt]) => {
         const chip = createElement('button', {
             className: 'prompt-suggestion-chip preset-chip',
-            text: label
+            text: label,
         });
 
         chip.addEventListener('click', (e) => {
@@ -133,17 +135,17 @@ export function createPromptInput(onPromptChange, onFocusChange) {
     const suggestionsLabel = createElement('p', {
         className: 'text-sm text-gray-400 mt-3 mb-2',
         text: 'Suggestions:',
-        style: { display: isMobile ? 'none' : 'block' }
+        style: { display: isMobile ? 'none' : 'block' },
     });
 
     const suggestionsContainer = createElement('div', {
-        className: 'prompt-suggestions'
+        className: 'prompt-suggestions',
     });
 
     PROMPTS.suggestions.forEach((suggestion) => {
         const chip = createElement('button', {
             className: 'prompt-suggestion-chip',
-            text: suggestion.substring(0, 30) + (suggestion.length > 30 ? '...' : '')
+            text: suggestion.substring(0, 30) + (suggestion.length > 30 ? '...' : ''),
         });
 
         chip.addEventListener('click', (e) => {

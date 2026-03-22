@@ -35,12 +35,12 @@ export class ImageProcessor {
 
         const videoWidth = video.videoWidth || video.width || 320;
         const videoHeight = video.videoHeight || video.height || 240;
-        
+
         const currentProfile = QOS_PROFILES[performanceTier] || QOS_PROFILES.high;
         const maxSize = currentProfile.MAX_INFERENCE_SIZE;
 
         let canvasWidth, canvasHeight;
-        
+
         // Maintain aspect ratio while constraining to max size
         if (videoWidth > videoHeight) {
             if (videoWidth > maxSize) {
@@ -66,7 +66,9 @@ export class ImageProcessor {
             this.canvas.height = canvasHeight;
             this.cachedRawImage = null; // Invalidate cache on resize
             if (MODEL_CONFIG.DEBUG) {
-                console.log(`📐 Canvas resized to ${canvasWidth}x${canvasHeight} (from ${videoWidth}x${videoHeight})`);
+                console.log(
+                    `📐 Canvas resized to ${canvasWidth}x${canvasHeight} (from ${videoWidth}x${videoHeight})`
+                );
             }
         }
 
@@ -76,7 +78,7 @@ export class ImageProcessor {
 
         // Draw current video frame to canvas (downscaled)
         this.ctx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
-        
+
         if (MODEL_CONFIG.DEBUG) console.log('📸 Captured frame:', canvasWidth, 'x', canvasHeight);
 
         return this.canvas;
@@ -91,15 +93,16 @@ export class ImageProcessor {
         if (!this.ctx) {
             throw new Error('Canvas context not initialized');
         }
-        
+
         const frame = this.ctx.getImageData(0, 0, canvas.width, canvas.height);
-        
+
         // Reuse RawImage buffer to minimize GC pressure
         const expectedSize = frame.width * frame.height * 4;
-        const canReuseRawImage = !!this.cachedRawImage
-            && this.cachedRawImage.width === frame.width
-            && this.cachedRawImage.height === frame.height
-            && this.cachedRawImage.data?.length === expectedSize;
+        const canReuseRawImage =
+            !!this.cachedRawImage &&
+            this.cachedRawImage.width === frame.width &&
+            this.cachedRawImage.height === frame.height &&
+            this.cachedRawImage.data?.length === expectedSize;
 
         if (!canReuseRawImage) {
             this.cachedRawImage = new RawImage(frame.data, frame.width, frame.height, 4);
@@ -130,9 +133,9 @@ export class ImageProcessor {
         return [
             {
                 role: 'system',
-                content: systemPrompt
+                content: systemPrompt,
             },
-            { role: 'user', content: `<image>${instruction}` }
+            { role: 'user', content: `<image>${instruction}` },
         ];
     }
 
@@ -144,7 +147,7 @@ export class ImageProcessor {
      */
     preparePrompt(applyTemplate, messages) {
         const prompt = applyTemplate(messages, {
-            add_generation_prompt: true
+            add_generation_prompt: true,
         });
 
         if (MODEL_CONFIG.DEBUG) console.log('📝 Processing inputs...');
@@ -172,7 +175,7 @@ export class ImageProcessor {
         }
         return {
             width: this.canvas.width,
-            height: this.canvas.height
+            height: this.canvas.height,
         };
     }
 }

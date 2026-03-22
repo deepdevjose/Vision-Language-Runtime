@@ -5,14 +5,11 @@
 import { createElement, addClass, removeClass } from '../utils/dom-helpers.js';
 
 export function createDraggableContainer(config = {}) {
-    const {
-        initialPosition = 'bottom-left',
-        children = []
-    } = config;
+    const { initialPosition = 'bottom-left', children = [] } = config;
 
     const container = createElement('div', {
         className: 'draggable-container',
-        children
+        children,
     });
 
     // Set initial position
@@ -33,22 +30,24 @@ export function createDraggableContainer(config = {}) {
     let initialY = 0;
     let containerWidth = 0;
     let containerHeight = 0;
-    
+
     // Disable dragging on mobile devices (position fixed via CSS)
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
 
     function dragStart(e) {
         // Skip on mobile (fixed positioning via CSS)
         if (isMobile) return;
-        
+
         // Don't drag if clicking on interactive elements
         const target = e.target;
-        if (target.tagName === 'BUTTON' || 
-            target.tagName === 'TEXTAREA' || 
+        if (
+            target.tagName === 'BUTTON' ||
+            target.tagName === 'TEXTAREA' ||
             target.tagName === 'INPUT' ||
             target.closest('button') ||
             target.closest('textarea') ||
-            target.closest('input')) {
+            target.closest('input')
+        ) {
             return;
         }
 
@@ -58,12 +57,12 @@ export function createDraggableContainer(config = {}) {
 
         isDragging = true;
         addClass(container, 'dragging');
-        
+
         // Cache dimensions during drag start to avoid layout thrashing
         const rect = container.getBoundingClientRect();
         containerWidth = rect.width;
         containerHeight = rect.height;
-        
+
         // Set pointer capture for better tracking
         container.setPointerCapture(e.pointerId);
     }
@@ -92,10 +91,10 @@ export function createDraggableContainer(config = {}) {
 
     function dragEnd(e) {
         if (!isDragging) return;
-        
+
         isDragging = false;
         removeClass(container, 'dragging');
-        
+
         // Release pointer capture (only if we captured it)
         try {
             container.releasePointerCapture(e.pointerId);

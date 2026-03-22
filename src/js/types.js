@@ -3,7 +3,7 @@
 /**
  * @file Type definitions for Vision-Language Runtime
  * JSDoc types for better IDE support and documentation
- * 
+ *
  * ViewState values must match state-machine.js ViewState enum:
  *   'welcome' | 'permission' | 'loading' | 'runtime' | 'error' | 'image-upload'
  */
@@ -73,6 +73,41 @@
  * @property {number} tokensPerSecond - Estimated tokens/s
  * @property {number} estimatedMemoryMB - Estimated memory usage
  */
+
+/**
+ * Constants for ViewState values
+ * Must be synchronized with state-machine.js ViewState typedef
+ */
+export const VIEW_STATES = {
+    WELCOME: 'welcome',
+    PERMISSION: 'permission',
+    LOADING: 'loading',
+    RUNTIME: 'runtime',
+    ERROR: 'error',
+    IMAGE_UPLOAD: 'image-upload',
+};
+
+/**
+ * Constants for RuntimeState values
+ */
+export const RUNTIME_STATES = {
+    IDLE: 'idle',
+    WARMING: 'warming',
+    RUNNING: 'running',
+    PAUSED: 'paused',
+    RECOVERING: 'recovering',
+    FAILED: 'failed',
+};
+
+/**
+ * Constants for LoadingPhase values
+ */
+export const LOADING_PHASES = {
+    LOADING_MODEL: 'loading-model',
+    LOADING_WGPU: 'loading-wgpu',
+    WARMING_UP: 'warming-up',
+    COMPLETE: 'complete',
+};
 
 /**
  * ViewState values synchronized with state-machine.js

@@ -15,7 +15,7 @@ export function createAsciiBackground(videoElement) {
 
     // ASCII character ramp (light to dark)
     // Using minimal set for cleaner look
-    const chars = " .·:-=+*#@";
+    const chars = ' .·:-=+*#@';
 
     let rafId = null;
     let isRunning = false;
@@ -23,11 +23,11 @@ export function createAsciiBackground(videoElement) {
 
     // Configuration
     const config = {
-        cols: 130,              // ASCII columns (balance detail vs performance)
-        fps: 10,                // Target FPS (throttled via rAF)
-        aspectCorrection: 0.55  // Characters aren't square
+        cols: 130, // ASCII columns (balance detail vs performance)
+        fps: 10, // Target FPS (throttled via rAF)
+        aspectCorrection: 0.55, // Characters aren't square
     };
-    
+
     // Persistent buffer array to reduce GC allocations map -> join
     let outputBuffer = [];
 
@@ -70,7 +70,7 @@ export function createAsciiBackground(videoElement) {
 
             // Convert pixels to ASCII
             for (let y = 0; y < rows; y++) {
-                let rowChars = "";
+                let rowChars = '';
                 const rowOffset = y * config.cols * 4;
                 for (let x = 0; x < config.cols; x++) {
                     const i = rowOffset + x * 4;
@@ -92,7 +92,7 @@ export function createAsciiBackground(videoElement) {
                 outputBuffer[y] = rowChars;
             }
 
-            pre.textContent = outputBuffer.join("\n");
+            pre.textContent = outputBuffer.join('\n');
         } catch (err) {
             // Silently handle errors (e.g., video not ready)
             console.warn('ASCII render error:', err);
@@ -123,12 +123,12 @@ export function createAsciiBackground(videoElement) {
             }
 
             // Clear ASCII output
-            pre.textContent = "";
+            pre.textContent = '';
         },
 
         cleanup() {
             this.stop();
-        }
+        },
     };
 
     return component;

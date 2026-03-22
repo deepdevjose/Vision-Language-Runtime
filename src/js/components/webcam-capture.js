@@ -6,17 +6,17 @@ import { createElement, addClass, removeClass } from '../utils/dom-helpers.js';
 
 export function createWebcamCapture(onToggle) {
     const isMobile = window.matchMedia('(max-width: 768px)').matches;
-    
+
     const container = createElement('div', {
-        className: 'webcam-controls'
+        className: 'webcam-controls',
     });
 
     // Toggle button (Play/Pause)
     const toggleButton = createElement('button', {
         className: 'webcam-toggle-btn',
         attributes: {
-            'aria-label': 'Toggle video captioning'
-        }
+            'aria-label': 'Toggle video captioning',
+        },
     });
 
     // Play icon (default state)
@@ -54,7 +54,7 @@ export function createWebcamCapture(onToggle) {
     // Processing pill (mobile: top-right, desktop: below button)
     const processingPill = createElement('div', {
         className: isMobile ? 'processing-pill' : 'webcam-status',
-        text: ''
+        text: '',
     });
 
     if (isMobile) {
@@ -81,7 +81,7 @@ export function createWebcamCapture(onToggle) {
     // Public methods
     container.updateStatus = (status, isError = false) => {
         processingPill.textContent = status;
-        
+
         if (isError) {
             addClass(processingPill, 'error');
         } else {
@@ -91,7 +91,7 @@ export function createWebcamCapture(onToggle) {
         // Show pill and auto-hide
         processingPill.style.opacity = '1';
         processingPill.style.transform = 'translateY(0)';
-        
+
         if (!isError && isMobile) {
             autoHide();
         }

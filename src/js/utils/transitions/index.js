@@ -15,7 +15,7 @@ import { errorTransitions } from './errors.js';
  * - Maintains insertion order (permission → loading → runtime → error)
  * - Reduces merge conflicts by separating concerns
  * - Simplifies debugging and reduces cognitive load
- * 
+ *
  * Domains:
  * - Permissions: Camera access flows (~2 transitions)
  * - Loading: Model initialization and warmup (~7 transitions)
@@ -26,7 +26,7 @@ export const transitionMap = [
     ...permissionsTransitions,
     ...loadingTransitions,
     ...runtimeTransitions,
-    ...errorTransitions
+    ...errorTransitions,
 ];
 
 // Named exports for domain-specific access (if needed for audit/debugging)

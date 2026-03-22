@@ -5,13 +5,7 @@
 import { createElement } from '../utils/dom-helpers.js';
 
 export function createGlassContainer(config = {}) {
-    const {
-        className = '',
-        bgColor = null,
-        role = null,
-        ariaLabel = null,
-        children = []
-    } = config;
+    const { className = '', bgColor = null, role = null, ariaLabel = null, children = [] } = config;
 
     let containerClass = 'glass-container ' + className;
 
@@ -27,10 +21,10 @@ export function createGlassContainer(config = {}) {
         className: containerClass,
         attributes: {
             ...(role && { role }),
-            ...(ariaLabel && { 'aria-label': ariaLabel })
+            ...(ariaLabel && { 'aria-label': ariaLabel }),
         },
         style: bgColor ? { background: bgColor } : {},
-        children
+        children,
     });
 
     return container;

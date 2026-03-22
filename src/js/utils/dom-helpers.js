@@ -16,15 +16,36 @@
 
 // Properties that must be assigned directly on the DOM node (not via setAttribute)
 const DOM_PROPERTIES = new Set([
-    'textContent', 'innerHTML', 'value', 'checked', 'disabled',
-    'type', 'accept', 'placeholder', 'rows', 'maxLength',
-    'src', 'alt', 'href', 'target', 'readOnly', 'required',
-    'autoComplete', 'tabIndex', 'draggable'
+    'textContent',
+    'innerHTML',
+    'value',
+    'checked',
+    'disabled',
+    'type',
+    'accept',
+    'placeholder',
+    'rows',
+    'maxLength',
+    'src',
+    'alt',
+    'href',
+    'target',
+    'readOnly',
+    'required',
+    'autoComplete',
+    'tabIndex',
+    'draggable',
 ]);
 
 // Keys handled explicitly by createElement — skip in the fallback loop
 const HANDLED_KEYS = new Set([
-    'className', 'id', 'text', 'html', 'style', 'children', 'attributes'
+    'className',
+    'id',
+    'text',
+    'html',
+    'style',
+    'children',
+    'attributes',
 ]);
 
 export function createElement(tag, options = {}) {
@@ -148,10 +169,14 @@ export function sleep(ms, signal) {
         const timeout = setTimeout(resolve, ms);
 
         if (signal) {
-            signal.addEventListener('abort', () => {
-                clearTimeout(timeout);
-                reject(new DOMException('Aborted', 'AbortError'));
-            }, { once: true });
+            signal.addEventListener(
+                'abort',
+                () => {
+                    clearTimeout(timeout);
+                    reject(new DOMException('Aborted', 'AbortError'));
+                },
+                { once: true }
+            );
         }
     });
 }

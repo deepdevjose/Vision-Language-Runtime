@@ -19,7 +19,9 @@ function test(name, fn) {
 
 function assertEqual(actual, expected, message) {
     if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-        throw new Error(`${message}\nExpected: ${JSON.stringify(expected)}\nActual:   ${JSON.stringify(actual)}`);
+        throw new Error(
+            `${message}\nExpected: ${JSON.stringify(expected)}\nActual:   ${JSON.stringify(actual)}`
+        );
     }
 }
 
@@ -41,7 +43,7 @@ function createSM(overrides = {}) {
         isVideoReady: false,
         hasWebGPU: false,
         error: null,
-        ...overrides
+        ...overrides,
     });
 }
 
@@ -129,12 +131,15 @@ test('PERMISSION_DENIED transitions to error with recoverAction', () => {
     const sm = createSM({ viewState: 'permission' });
     const ok = sm.dispatch('PERMISSION_DENIED', {
         message: 'Camera access denied',
-        technical: 'NotAllowedError'
+        technical: 'NotAllowedError',
     });
     assertTrue(ok, 'PERMISSION_DENIED should succeed');
     assertEqual(sm.getState().viewState, 'error', 'Should transition to error');
     assertEqual(sm.getState().error.code, 'CAMERA_DENIED', 'Error code should be CAMERA_DENIED');
-    assertTrue(typeof sm.getState().error.recoverAction.handler === 'function', 'Should have recover handler');
+    assertTrue(
+        typeof sm.getState().error.recoverAction.handler === 'function',
+        'Should have recover handler'
+    );
 });
 
 // ── RETRY from error ────────────────────────────────────────────
@@ -157,20 +162,24 @@ test('STREAM_ENDED sets runtime to recovering with reconnect action', () => {
     assertEqual(sm.getState().viewState, 'runtime', 'Should stay on runtime');
     assertEqual(sm.getState().runtimeState, 'recovering', 'runtimeState should be recovering');
     assertEqual(sm.getState().error.code, 'STREAM_LOST', 'Error code should be STREAM_LOST');
-    assertEqual(sm.getState().error.recoverAction.label, 'Reconnect', 'Recover button should say Reconnect');
+    assertEqual(
+        sm.getState().error.recoverAction.label,
+        'Reconnect',
+        'Recover button should say Reconnect'
+    );
 });
 
 test('RETRY_STREAM from recovering transitions to permission', () => {
     const stopped = [];
     const fakeStream = {
-        getTracks: () => [{ stop: () => stopped.push('stopped') }]
+        getTracks: () => [{ stop: () => stopped.push('stopped') }],
     };
     const sm = createSM({
         viewState: 'runtime',
         runtimeState: 'recovering',
         webcamStream: fakeStream,
         isVideoReady: true,
-        error: { code: 'STREAM_LOST' }
+        error: { code: 'STREAM_LOST' },
     });
     const ok = sm.dispatch('RETRY_STREAM');
     assertTrue(ok, 'RETRY_STREAM should succeed');
@@ -196,7 +205,7 @@ test('STREAM_RECOVERED restores running state with new stream', () => {
     const sm = createSM({
         viewState: 'runtime',
         runtimeState: 'recovering',
-        error: { code: 'STREAM_LOST' }
+        error: { code: 'STREAM_LOST' },
     });
     const ok = sm.dispatch('STREAM_RECOVERED', { stream: newStream });
     assertTrue(ok, 'STREAM_RECOVERED should succeed');
@@ -210,7 +219,9 @@ test('STREAM_RECOVERED restores running state with new stream', () => {
 test('StateMachine never emits "transition" event', () => {
     const sm = createSM({ hasWebGPU: true });
     let transitionFired = false;
-    sm.addEventListener('transition', () => { transitionFired = true; });
+    sm.addEventListener('transition', () => {
+        transitionFired = true;
+    });
     sm.dispatch('START');
     assertFalse(transitionFired, '"transition" event should never be emitted');
 });
@@ -230,7 +241,7 @@ test('FATAL_ERROR transitions to error from any state', () => {
     const sm = createSM({ viewState: 'loading' });
     const ok = sm.dispatch('FATAL_ERROR', {
         code: 'UNKNOWN',
-        message: 'Something broke'
+        message: 'Something broke',
     });
     assertTrue(ok, 'FATAL_ERROR should succeed');
     assertEqual(sm.getState().viewState, 'error', 'Should be on error screen');
@@ -254,7 +265,7 @@ test('WARMUP_COMPLETE from loading transitions to runtime when video ready', () 
         viewState: 'loading',
         runtimeState: 'warming',
         loadingPhase: 'warming-up',
-        isVideoReady: true
+        isVideoReady: true,
     });
     const ok = sm.dispatch('WARMUP_COMPLETE');
     assertTrue(ok, 'WARMUP_COMPLETE should succeed');
@@ -267,7 +278,7 @@ test('WARMUP_COMPLETE from loading fails guard when video not ready', () => {
     const sm = createSM({
         viewState: 'loading',
         runtimeState: 'warming',
-        isVideoReady: false
+        isVideoReady: false,
     });
     const ok = sm.dispatch('WARMUP_COMPLETE');
     assertFalse(ok, 'WARMUP_COMPLETE should fail guard');
@@ -277,7 +288,7 @@ test('WARMUP_COMPLETE from loading fails guard when video not ready', () => {
 test('Late WARMUP_COMPLETE from runtime is absorbed (no-op)', () => {
     const sm = createSM({
         viewState: 'runtime',
-        runtimeState: 'running'
+        runtimeState: 'running',
     });
     const ok = sm.dispatch('WARMUP_COMPLETE');
     assertTrue(ok, 'Late WARMUP_COMPLETE should be accepted');
@@ -323,7 +334,11 @@ async function runTests() {
         try {
             if (fn.length > 0) {
                 await new Promise((resolve, reject) => {
-                    try { fn(resolve); } catch (e) { reject(e); }
+                    try {
+                        fn(resolve);
+                    } catch (e) {
+                        reject(e);
+                    }
                 });
             } else {
                 fn();
@@ -343,7 +358,7 @@ async function runTests() {
 
 // Auto-run in Node.js
 if (typeof process !== 'undefined') {
-    runTests().then(results => {
+    runTests().then((results) => {
         process.exit(results.failed > 0 ? 1 : 0);
     });
 }

@@ -12,12 +12,12 @@ import logger from '../utils/logger.js';
  * Error icon mapping
  */
 const ERROR_ICONS = {
-    'CAMERA_DENIED': '🚫',
-    'CAMERA_NOT_FOUND': '📷',
-    'STREAM_LOST': '⚠️',
-    'MODEL_LOAD_FAILED': '❌',
-    'WEBGPU_NOT_SUPPORTED': '⚡',
-    'UNKNOWN_ERROR': '⚠️'
+    CAMERA_DENIED: '🚫',
+    CAMERA_NOT_FOUND: '📷',
+    STREAM_LOST: '⚠️',
+    MODEL_LOAD_FAILED: '❌',
+    WEBGPU_NOT_SUPPORTED: '⚡',
+    UNKNOWN_ERROR: '⚠️',
 };
 
 /**
@@ -35,50 +35,51 @@ export function createErrorScreen(errorState) {
     logger.error('Error screen displayed', {
         code: errorState.code,
         message: errorState.message,
-        technical: errorState.technical
+        technical: errorState.technical,
     });
 
     const wrapper = createElement('div', {
-        className: 'error-screen-wrapper flex items-center justify-center min-h-screen'
+        className: 'error-screen-wrapper flex items-center justify-center min-h-screen',
     });
 
     const container = createGlassContainer({
-        className: 'max-w-md mx-4 p-8'
+        className: 'max-w-md mx-4 p-8',
     });
 
     // Error icon
     const icon = createElement('div', {
         className: 'text-6xl text-center mb-6 animate-pulse',
-        textContent: ERROR_ICONS[errorState.code] || ERROR_ICONS['UNKNOWN_ERROR']
+        textContent: ERROR_ICONS[errorState.code] || ERROR_ICONS['UNKNOWN_ERROR'],
     });
 
     // Error title
     const title = createElement('h2', {
         className: 'text-2xl font-light text-center mb-3',
-        textContent: getErrorTitle(errorState.code)
+        textContent: getErrorTitle(errorState.code),
     });
 
     // Error message
     const message = createElement('p', {
         className: 'text-sm opacity-80 text-center mb-6 leading-relaxed',
-        textContent: errorState.message
+        textContent: errorState.message,
     });
 
     // Technical details (collapsible)
     let technicalDetails = null;
     if (errorState.technical) {
         const detailsToggle = createElement('button', {
-            className: 'text-xs opacity-60 hover:opacity-100 transition-opacity mb-4 w-full text-center underline',
-            textContent: 'Show technical details'
+            className:
+                'text-xs opacity-60 hover:opacity-100 transition-opacity mb-4 w-full text-center underline',
+            textContent: 'Show technical details',
         });
 
         technicalDetails = createElement('div', {
-            className: 'hidden bg-black/30 rounded-lg p-4 mb-6 text-xs font-mono overflow-x-auto'
+            className: 'hidden bg-black/30 rounded-lg p-4 mb-6 text-xs font-mono overflow-x-auto',
         });
 
         const technicalText = createElement('code', {
             className: 'text-red-300',
-            textContent: errorState.technical
+            textContent: errorState.technical,
         });
 
         technicalDetails.appendChild(technicalText);
@@ -101,14 +102,14 @@ export function createErrorScreen(errorState) {
 
     // Action buttons
     const buttonContainer = createElement('div', {
-        className: 'flex gap-3 justify-center'
+        className: 'flex gap-3 justify-center',
     });
 
     // Recovery action button
     if (errorState.recoverAction) {
         const recoverButton = createGlassButton({
             text: errorState.recoverAction.label,
-            className: 'px-6 py-3'
+            className: 'px-6 py-3',
         });
 
         recoverButton.addEventListener('click', () => {
@@ -122,7 +123,7 @@ export function createErrorScreen(errorState) {
     // Always provide a "Reload" fallback
     const reloadButton = createGlassButton({
         text: 'Reload Page',
-        className: 'px-6 py-3 opacity-60'
+        className: 'px-6 py-3 opacity-60',
     });
 
     reloadButton.addEventListener('click', () => {
@@ -149,12 +150,12 @@ export function createErrorScreen(errorState) {
  */
 function getErrorTitle(code) {
     const titles = {
-        'CAMERA_DENIED': 'Camera Access Denied',
-        'CAMERA_NOT_FOUND': 'No Camera Detected',
-        'STREAM_LOST': 'Camera Connection Lost',
-        'MODEL_LOAD_FAILED': 'Model Load Failed',
-        'WEBGPU_NOT_SUPPORTED': 'WebGPU Not Supported',
-        'UNKNOWN_ERROR': 'Something Went Wrong'
+        CAMERA_DENIED: 'Camera Access Denied',
+        CAMERA_NOT_FOUND: 'No Camera Detected',
+        STREAM_LOST: 'Camera Connection Lost',
+        MODEL_LOAD_FAILED: 'Model Load Failed',
+        WEBGPU_NOT_SUPPORTED: 'WebGPU Not Supported',
+        UNKNOWN_ERROR: 'Something Went Wrong',
     };
 
     return titles[code] || titles['UNKNOWN_ERROR'];

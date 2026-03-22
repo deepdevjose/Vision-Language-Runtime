@@ -10,7 +10,6 @@ import { test, expect } from '@playwright/test';
 const BASE_URL = 'http://localhost:8000/';
 
 test.describe('Vision-Language Runtime', () => {
-
     test('loads page successfully', async ({ page }) => {
         await page.goto(BASE_URL);
         await expect(page).toHaveTitle(/Vision-Language Runtime/);
@@ -88,7 +87,7 @@ test.describe('Vision-Language Runtime', () => {
 
         // Click Launch Runtime
         const launchBtn = page.locator('button:has-text("Launch Runtime"):visible').first();
-        if (await launchBtn.count() > 0) {
+        if ((await launchBtn.count()) > 0) {
             await launchBtn.click();
         }
 
@@ -159,11 +158,9 @@ test.describe('Vision-Language Runtime', () => {
         await expect(ghLink).toHaveAttribute('target', '_blank');
         await expect(ghLink).toHaveAttribute('rel', /noopener/);
     });
-
 });
 
 test.describe('Performance', () => {
-
     test('page loads within acceptable time', async ({ page }) => {
         const startTime = Date.now();
         await page.goto(BASE_URL);
@@ -175,7 +172,7 @@ test.describe('Performance', () => {
 
     test('no critical console errors on load', async ({ page }) => {
         const errors = [];
-        page.on('console', msg => {
+        page.on('console', (msg) => {
             if (msg.type() === 'error') {
                 errors.push(msg.text());
             }
@@ -187,25 +184,25 @@ test.describe('Performance', () => {
         // Filter out expected errors in headless (no GPU, no camera)
         // WebGPU detector emits multi-line console.error blocks with
         // decorative lines, instructions, and diagnostic info
-        const criticalErrors = errors.filter(err =>
-            !err.includes('WebGPU') &&
-            !err.includes('getUserMedia') &&
-            !err.includes('camera') &&
-            !err.includes('navigator.gpu') &&
-            !err.includes('adapter') &&
-            !err.includes('GPU') &&
-            !err.includes('chrome://flags') &&
-            !err.includes('━') &&
-            !err.includes('webgpu') &&
-            !err.includes('Restart browser') &&
-            !err.includes('Running in a VM') &&
-            !err.includes('Alternative URL') &&
-            !err.includes('This might mean:') &&
-            !err.trim().startsWith('•') &&
-            err.trim().length > 0
+        const criticalErrors = errors.filter(
+            (err) =>
+                !err.includes('WebGPU') &&
+                !err.includes('getUserMedia') &&
+                !err.includes('camera') &&
+                !err.includes('navigator.gpu') &&
+                !err.includes('adapter') &&
+                !err.includes('GPU') &&
+                !err.includes('chrome://flags') &&
+                !err.includes('━') &&
+                !err.includes('webgpu') &&
+                !err.includes('Restart browser') &&
+                !err.includes('Running in a VM') &&
+                !err.includes('Alternative URL') &&
+                !err.includes('This might mean:') &&
+                !err.trim().startsWith('•') &&
+                err.trim().length > 0
         );
 
         expect(criticalErrors).toEqual([]);
     });
-
 });

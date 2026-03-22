@@ -70,7 +70,7 @@ class StateMachine extends EventTarget {
             isVideoReady: false,
             hasWebGPU: true,
             error: null,
-            ...initialState
+            ...initialState,
         };
 
         /** @type {StateTransition[]} */
@@ -84,14 +84,14 @@ class StateMachine extends EventTarget {
      * - Loading: Model initialization and warmup
      * - Runtime: Live inference, pause/resume, stream recovery
      * - Errors: Error handling and recovery
-     * 
+     *
      * Each guard and action is bound to this StateMachine instance for proper state access
-     * 
+     *
      * @returns {StateTransition[]}
      */
     defineTransitions() {
         // Bind all transition guards and actions to this instance's context
-        return transitionMap.map(transition => {
+        return transitionMap.map((transition) => {
             const wrapped = { ...transition };
 
             // Wrap guard to bind 'this' context if present
@@ -118,8 +118,8 @@ class StateMachine extends EventTarget {
         const currentState = this.state.viewState;
 
         // Find matching transition
-        const transition = this.transitions.find(t =>
-            t.event === event && (t.from === currentState || t.from === '*')
+        const transition = this.transitions.find(
+            (t) => t.event === event && (t.from === currentState || t.from === '*')
         );
 
         if (!transition) {
@@ -146,17 +146,21 @@ class StateMachine extends EventTarget {
         }
 
         // Emit change event
-        this.dispatchEvent(new CustomEvent('statechange', {
-            detail: {
-                state: this.state,
-                prevState,
-                event,
-                data
-            }
-        }));
+        this.dispatchEvent(
+            new CustomEvent('statechange', {
+                detail: {
+                    state: this.state,
+                    prevState,
+                    event,
+                    data,
+                },
+            })
+        );
 
-        console.log(`[StateMachine] ${event}: ${prevState.viewState} → ${this.state.viewState}`,
-            { runtimeState: this.state.runtimeState, loadingPhase: this.state.loadingPhase });
+        console.log(`[StateMachine] ${event}: ${prevState.viewState} → ${this.state.viewState}`, {
+            runtimeState: this.state.runtimeState,
+            loadingPhase: this.state.loadingPhase,
+        });
 
         return true;
     }
@@ -169,9 +173,11 @@ class StateMachine extends EventTarget {
         const prevState = { ...this.state };
         this.state = { ...this.state, ...updates };
 
-        this.dispatchEvent(new CustomEvent('statechange', {
-            detail: { state: this.state, prevState, updates }
-        }));
+        this.dispatchEvent(
+            new CustomEvent('statechange', {
+                detail: { state: this.state, prevState, updates },
+            })
+        );
     }
 
     /**
@@ -199,8 +205,8 @@ class StateMachine extends EventTarget {
      * @returns {boolean}
      */
     canTransitionTo(targetState) {
-        return this.transitions.some(t =>
-            t.from === this.state.viewState && t.to === targetState
+        return this.transitions.some(
+            (t) => t.from === this.state.viewState && t.to === targetState
         );
     }
 
@@ -210,8 +216,8 @@ class StateMachine extends EventTarget {
      */
     getAvailableEvents() {
         return this.transitions
-            .filter(t => t.from === this.state.viewState || t.from === '*')
-            .map(t => t.event);
+            .filter((t) => t.from === this.state.viewState || t.from === '*')
+            .map((t) => t.event);
     }
 }
 

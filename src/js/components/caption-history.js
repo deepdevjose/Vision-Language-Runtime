@@ -12,24 +12,24 @@ export function createCaptionHistory() {
 
     const container = createGlassContainer({
         className: 'caption-history-container rounded-2xl shadow-2xl',
-        children: []
+        children: [],
     });
 
     // Header
     const header = createElement('div', {
-        className: 'caption-history-header'
+        className: 'caption-history-header',
     });
 
     const title = createElement('h3', {
         className: 'text-sm font-semibold text-gray-200',
-        text: 'Caption History'
+        text: 'Caption History',
     });
 
     // Export button
     const exportBtn = createElement('button', {
         className: 'glass-button text-xs px-3 py-1',
         text: '📥 Export JSON',
-        attributes: { 'aria-label': 'Export history as JSON' }
+        attributes: { 'aria-label': 'Export history as JSON' },
     });
 
     exportBtn.addEventListener('click', () => {
@@ -41,12 +41,12 @@ export function createCaptionHistory() {
 
     // History list
     const listContainer = createElement('div', {
-        className: 'caption-history-list'
+        className: 'caption-history-list',
     });
 
     const emptyState = createElement('p', {
         className: 'text-sm text-gray-400 text-center py-4',
-        text: 'No captions yet. Start capturing to see history.'
+        text: 'No captions yet. Start capturing to see history.',
     });
 
     listContainer.appendChild(emptyState);
@@ -60,7 +60,7 @@ export function createCaptionHistory() {
             timestamp: new Date().toISOString(),
             prompt: prompt || 'N/A',
             caption: caption,
-            frozen: isFrozen
+            frozen: isFrozen,
         };
 
         history.unshift(entry); // Add to beginning
@@ -82,22 +82,22 @@ export function createCaptionHistory() {
 
         history.forEach((entry) => {
             const item = createElement('div', {
-                className: 'caption-history-item'
+                className: 'caption-history-item',
             });
 
             const meta = createElement('div', {
-                className: 'caption-history-meta'
+                className: 'caption-history-meta',
             });
 
             const time = new Date(entry.timestamp).toLocaleTimeString();
             const timeSpan = createElement('span', {
                 className: 'text-xs text-gray-400',
-                text: `${time}${entry.frozen ? ' 🧊' : ''}`
+                text: `${time}${entry.frozen ? ' 🧊' : ''}`,
             });
 
             const promptSpan = createElement('span', {
                 className: 'text-xs text-gray-500 italic truncate',
-                text: entry.prompt.substring(0, 30) + (entry.prompt.length > 30 ? '...' : '')
+                text: entry.prompt.substring(0, 30) + (entry.prompt.length > 30 ? '...' : ''),
             });
 
             meta.appendChild(timeSpan);
@@ -105,17 +105,17 @@ export function createCaptionHistory() {
 
             const captionText = createElement('p', {
                 className: 'caption-history-text',
-                text: entry.caption
+                text: entry.caption,
             });
 
             const actions = createElement('div', {
-                className: 'caption-history-actions'
+                className: 'caption-history-actions',
             });
 
             const copyBtn = createElement('button', {
                 className: 'glass-button text-xs px-2 py-1',
                 text: '📋',
-                attributes: { 'aria-label': 'Copy caption' }
+                attributes: { 'aria-label': 'Copy caption' },
             });
 
             copyBtn.addEventListener('click', () => {
@@ -145,8 +145,8 @@ export function createCaptionHistory() {
         const link = createElement('a', {
             attributes: {
                 href: url,
-                download: `caption-history-${Date.now()}.json`
-            }
+                download: `caption-history-${Date.now()}.json`,
+            },
         });
         link.click();
         URL.revokeObjectURL(url);
@@ -160,6 +160,6 @@ export function createCaptionHistory() {
         clearHistory: () => {
             history.length = 0;
             updateUI();
-        }
+        },
     };
 }

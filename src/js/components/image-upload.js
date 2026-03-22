@@ -18,22 +18,22 @@ export function createImageUpload(onImageSelected) {
     logger.info('Creating image upload component (fallback mode)');
 
     const container = createGlassContainer({
-        className: 'max-w-2xl mx-auto mt-20 p-8'
+        className: 'max-w-2xl mx-auto mt-20 p-8',
     });
 
     // Header
     const header = createElement('div', {
-        className: 'text-center mb-8'
+        className: 'text-center mb-8',
     });
 
     const title = createElement('h2', {
         className: 'text-2xl font-light mb-2',
-        textContent: '📸 Upload Image'
+        textContent: '📸 Upload Image',
     });
 
     const subtitle = createElement('p', {
         className: 'text-sm opacity-60',
-        textContent: 'WebGPU not available - using image upload mode'
+        textContent: 'WebGPU not available - using image upload mode',
     });
 
     header.appendChild(title);
@@ -41,27 +41,28 @@ export function createImageUpload(onImageSelected) {
 
     // Upload zone
     const uploadZone = createElement('div', {
-        className: 'relative border-2 border-dashed border-white/30 rounded-2xl p-12 text-center hover:border-white/50 transition-colors cursor-pointer bg-white/5'
+        className:
+            'relative border-2 border-dashed border-white/30 rounded-2xl p-12 text-center hover:border-white/50 transition-colors cursor-pointer bg-white/5',
     });
 
     const uploadIcon = createElement('div', {
         className: 'text-6xl mb-4',
-        textContent: '🖼️'
+        textContent: '🖼️',
     });
 
     const uploadText = createElement('p', {
         className: 'text-lg mb-2',
-        textContent: 'Click to select an image'
+        textContent: 'Click to select an image',
     });
 
     const uploadHint = createElement('p', {
         className: 'text-sm opacity-60',
-        textContent: 'or drag and drop'
+        textContent: 'or drag and drop',
     });
 
     const supportedFormats = createElement('p', {
         className: 'text-xs opacity-40 mt-4',
-        textContent: 'Supported: JPG, PNG, WebP, GIF'
+        textContent: 'Supported: JPG, PNG, WebP, GIF',
     });
 
     uploadZone.appendChild(uploadIcon);
@@ -73,30 +74,30 @@ export function createImageUpload(onImageSelected) {
     const fileInput = createElement('input', {
         type: 'file',
         accept: 'image/*',
-        className: 'hidden'
+        className: 'hidden',
     });
 
     // Preview area (hidden initially)
     const previewContainer = createElement('div', {
-        className: 'mt-6 hidden'
+        className: 'mt-6 hidden',
     });
 
     const previewImage = createElement('img', {
-        className: 'w-full rounded-xl max-h-96 object-contain bg-black/20'
+        className: 'w-full rounded-xl max-h-96 object-contain bg-black/20',
     });
 
     const previewButtons = createElement('div', {
-        className: 'flex gap-4 mt-4 justify-center'
+        className: 'flex gap-4 mt-4 justify-center',
     });
 
     const analyzeButton = createGlassButton({
         text: '🔍 Analyze Image',
-        className: 'px-6 py-3'
+        className: 'px-6 py-3',
     });
 
     const changeButton = createGlassButton({
         text: '↻ Change Image',
-        className: 'px-6 py-3 opacity-60'
+        className: 'px-6 py-3 opacity-60',
     });
 
     previewButtons.appendChild(analyzeButton);
@@ -114,10 +115,10 @@ export function createImageUpload(onImageSelected) {
         }
 
         selectedFile = file;
-        logger.info('Image selected', { 
-            name: file.name, 
-            size: file.size, 
-            type: file.type 
+        logger.info('Image selected', {
+            name: file.name,
+            size: file.size,
+            type: file.type,
         });
 
         // Show preview
@@ -156,7 +157,7 @@ export function createImageUpload(onImageSelected) {
     uploadZone.addEventListener('drop', (e) => {
         e.preventDefault();
         uploadZone.classList.remove('border-white/70', 'bg-white/10');
-        
+
         const file = e.dataTransfer.files?.[0];
         if (file) {
             handleFileSelect(file);
@@ -197,16 +198,16 @@ export function createImageUpload(onImageSelected) {
 export async function fileToCanvas(file) {
     return new Promise((resolve, reject) => {
         const img = new Image();
-        
+
         img.onload = () => {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            
+
             // Set canvas size (maintain aspect ratio, max 640px)
             const maxSize = 640;
             let width = img.width;
             let height = img.height;
-            
+
             if (width > maxSize || height > maxSize) {
                 if (width > height) {
                     height = (height / width) * maxSize;
@@ -216,25 +217,25 @@ export async function fileToCanvas(file) {
                     height = maxSize;
                 }
             }
-            
+
             canvas.width = width;
             canvas.height = height;
-            
+
             ctx.drawImage(img, 0, 0, width, height);
-            
-            logger.debug('Image converted to canvas', { 
-                originalSize: `${img.width}x${img.height}`, 
-                canvasSize: `${width}x${height}` 
+
+            logger.debug('Image converted to canvas', {
+                originalSize: `${img.width}x${img.height}`,
+                canvasSize: `${width}x${height}`,
             });
-            
+
             resolve(canvas);
         };
-        
+
         img.onerror = () => {
             logger.error('Failed to load image', { file: file.name });
             reject(new Error('Failed to load image'));
         };
-        
+
         const reader = new FileReader();
         reader.onload = (e) => {
             img.src = /** @type {string} */ (e.target.result);
