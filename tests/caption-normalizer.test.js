@@ -1,36 +1,11 @@
 /**
- * Unit Tests for Caption Post-Processing
+ * Unit Tests for caption normalization utility.
+ *
+ * Run with: node tests/caption-normalizer.test.js
  */
 
-// Test caption normalizer
-function postProcessCaption(text) {
-    if (!text) return text;
-    
-    let cleaned = text;
-    
-    // Normalize spaces
-    cleaned = cleaned.replace(/\s+/g, ' ');
-    cleaned = cleaned.trim();
-    
-    // Remove repetitive phrases
-    cleaned = cleaned.replace(/\b(\w+\s+\w+\s+\w+)(\s+\1)+/gi, '$1');
-    
-    // Remove fillers
-    cleaned = cleaned.replace(/\buh+\b/gi, '');
-    cleaned = cleaned.replace(/\.{3,}/g, '...');
-    cleaned = cleaned.replace(/!{2,}/g, '!');
-    cleaned = cleaned.replace(/\?{2,}/g, '?');
-    
-    // Fix spacing
-    cleaned = cleaned.replace(/\s+([.,!?])/g, '$1');
-    cleaned = cleaned.replace(/([.,!?])(\w)/g, '$1 $2');
-    
-    cleaned = cleaned.trim();
-    
-    return cleaned;
-}
+import { postProcessCaption } from '../src/js/utils/caption-normalizer.js';
 
-// Test framework
 const tests = [];
 let passed = 0;
 let failed = 0;
@@ -45,7 +20,6 @@ function assertEqual(actual, expected, message) {
     }
 }
 
-// Tests
 test('Caption - normalizes multiple spaces', () => {
     const input = 'The  image   shows    something';
     const expected = 'The image shows something';
@@ -103,30 +77,29 @@ test('Caption - complex case', () => {
     assertEqual(postProcessCaption(input), expected, 'Should handle complex case');
 });
 
-// Run tests
-function runTests() {
-    console.log('\n🧪 Running Caption Normalizer Tests...\n');
-    
+async function runTests() {
+    console.log('\nRunning Caption Normalizer Tests...\n');
+
     for (const { name, fn } of tests) {
         try {
             fn();
-            console.log(`✅ ${name}`);
+            console.log(`PASS ${name}`);
             passed++;
         } catch (error) {
-            console.error(`❌ ${name}`);
+            console.error(`FAIL ${name}`);
             console.error(`   ${error.message}`);
             failed++;
         }
     }
-    
-    console.log(`\n📊 Results: ${passed} passed, ${failed} failed\n`);
+
+    console.log(`\nResults: ${passed} passed, ${failed} failed\n`);
     return { passed, failed, total: tests.length };
 }
 
-// Auto-run
-if (typeof module !== 'undefined' && module.exports) {
-    const results = runTests();
-    process.exit(results.failed > 0 ? 1 : 0);
+if (typeof process !== 'undefined') {
+    runTests().then(results => {
+        process.exit(results.failed > 0 ? 1 : 0);
+    });
 }
 
-export { runTests, postProcessCaption };
+export { runTests };

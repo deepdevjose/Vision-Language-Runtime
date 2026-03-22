@@ -5,22 +5,10 @@
 
 import { createElement, sleep } from '../utils/dom-helpers.js';
 import { PROMPTS, MODEL_CONFIG } from '../utils/constants.js';
+import { postProcessCaption } from '../utils/caption-normalizer.js';
 import { enumerateCameras, switchCamera } from '../services/webcam-service.js';
 
 let vlmService = null;
-
-function postProcessCaption(text) {
-    if (!text) return text;
-    let t = text.replace(/\s+/g, ' ').trim();
-    t = t.replace(/\b(\w+\s+\w+\s+\w+)(\s+\1)+/gi, '$1');
-    t = t.replace(/\buh+\b/gi, '');
-    t = t.replace(/\.{3,}/g, '...');
-    t = t.replace(/!{2,}/g, '!');
-    t = t.replace(/\?{2,}/g, '?');
-    t = t.replace(/\s+([.,!?])/g, '$1');
-    t = t.replace(/([.,!?])(\w)/g, '$1 $2');
-    return t.trim();
-}
 
 export function createCaptioningView(videoElement) {
     const container = createElement('div', { className: 'rt-layout' });

@@ -11,7 +11,8 @@
   },
   "rules": {
     "no-unused-vars": ["warn"],
-    "no-undef": "error"
+    "no-undef": "error",
+    "no-empty": "off"
   },
   "globals": {
     "Document": "readonly",

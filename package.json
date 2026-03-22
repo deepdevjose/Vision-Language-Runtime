@@ -7,8 +7,9 @@
     "dev": "http-server src -p 8000 -o -c-1",
     "start": "http-server src -p 8000 -c-1",
     "test": "npm run test:unit && npm run test:e2e",
-    "test:unit": "node tests/state-machine.test.js && node tests/dom-helpers.test.js && node tests/caption-normalizer.test.js",
+    "test:unit": "node tests/caption-normalizer.test.js && node tests/dom-helpers.test.js && node tests/state-machine.test.js",
     "test:e2e": "playwright test",
+    "test:e2e:chromium": "playwright test --project=chromium --reporter=line",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "lint": "eslint src/js/**/*.js",
@@ -26,7 +27,7 @@
   "devDependencies": {
     "@playwright/test": "^1.40.0",
     "@types/node": "^25.4.0",
-    "eslint": "^10.0.3",
+    "eslint": "^8.57.1",
     "http-server": "^14.1.1",
     "sharp": "^0.34.5",
     "typescript": "^5.3.3"
