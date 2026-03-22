@@ -363,7 +363,7 @@ $$
 Maintain top-$k$ hypotheses at each step. For beam size $k$:
 
 $$
-\mathcal{B}_t = \text{TopK}_{h \in \mathcal{B}_{t-1}, y \in \mathcal{V}} \left\{ (h \oplus y, \log P(h) + \log P(y \mid h, \mathbf{x}_v)) \right\}
+\mathcal{B}_t = \text{TopK}_{h \in \mathcal{B}_{t-1}, y \in \mathcal{V}} \Big\{ (h \oplus y, \log P(h) + \log P(y \mid h, \mathbf{x}_v)) \Big\}
 $$
 
 **Nucleus Sampling (Top-p):**
