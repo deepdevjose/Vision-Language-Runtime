@@ -164,22 +164,53 @@ http://YOUR_LOCAL_IP:8000
 
 ## Performance tuning
 
-Edit `js/utils/constants.js`:
+The app automatically detects your GPU and selects an optimal performance tier (`low`, `medium`, or `high`). Each tier controls inference size, token limit, and minimum frame timing.
+
+### Adjust performance per tier
+
+Edit `src/js/utils/constants.js` in the `QOS_PROFILES` object:
 
 ```javascript
-// Reduce for slower GPUs
-MAX_INFERENCE_SIZE: 512,  // Default: 640
+// For slower/older GPUs - edit QOS_PROFILES.low
+low: {
+    MAX_INFERENCE_SIZE: 320,  // Default inference resolution
+    MAX_NEW_TOKENS: 32,       // Output token limit
+    TIMING_DELAY_MS: 5000,    // Minimum ms between frames
+    SYSTEM_PROMPT: '...'      // Prompt for fast responses
+}
 
-// Increase for slower capture rate
-FRAME_CAPTURE_DELAY: 1000,  // Default: 500ms
+// For mid-range GPUs - edit QOS_PROFILES.medium
+medium: {
+    MAX_INFERENCE_SIZE: 480,
+    MAX_NEW_TOKENS: 64,
+    TIMING_DELAY_MS: 3500,
+    SYSTEM_PROMPT: '...'
+}
 
-// Enable debug logs
-MODEL_CONFIG.DEBUG = true
+// For high-end GPUs - edit QOS_PROFILES.high
+high: {
+    MAX_INFERENCE_SIZE: 640,  // Default: 640px
+    MAX_NEW_TOKENS: 128,
+    TIMING_DELAY_MS: 2000,
+    SYSTEM_PROMPT: '...'
+}
+```
+
+**Frame timing:** The app uses **dynamic frame delays** based on actual inference time. It waits at least `TIMING_DELAY_MS` and adds 20% buffer to measured time: `delay = max(TIMING_DELAY_MS, inferenceTime * 1.2)`. This prevents GPU throttling on slower hardware.
+
+### Enable debug mode
+
+```javascript
+// In src/js/utils/constants.js, find MODEL_CONFIG
+MODEL_CONFIG.DEBUG = true  // Auto-enabled on localhost
 ```
 
 ### Enable FP16 for 2× speed boost
 
 FP16 (half-precision floating-point) can **double inference speed** on compatible GPUs. The app automatically detects and uses FP16 if available.
+
+**Hardware tier auto-detection:**
+The app runs GPU capability tests on startup to determine if it's `low`, `medium`, or `high` tier. This controls frame resolution, token limits, and waiting times. You can see the detection results in the browser console on first load.
 
 **Check FP16 status:**
 Open browser console on first load - you'll see WebGPU detection results including FP16 availability.
@@ -224,7 +255,7 @@ Update your browser or check [webgpu.io](https://webgpu.io) for compatibility. T
 Clear cache, check console for CORS errors, verify internet connection
 
 **Slow performance?**  
-Lower `MAX_INFERENCE_SIZE`, increase `FRAME_CAPTURE_DELAY`, or close other GPU apps
+Reduce `MAX_INFERENCE_SIZE` in your hardware tier (320 for low, 480 for medium, 640 for high) or increase `TIMING_DELAY_MS` for more GPU rest time, or close other GPU-intensive apps
 
 **Camera blocked on mobile?**  
 - **Most common:** Not using HTTPS (required on mobile browsers)

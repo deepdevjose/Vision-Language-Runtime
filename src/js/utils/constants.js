@@ -32,14 +32,22 @@ export const LAYOUT = {
 };
 
 // Timing constants
+// ⚠️  These constants are defined but currently UNUSED in production code.
+// The actual frame timing is controlled by QOS_PROFILES.TIMING_DELAY_MS (per tier)
+// and dynamic delay calculation in telemetry.js: max(tierDelay, measuredInferenceTime * 1.2)
+// These may be used for planned features or can be removed if no longer needed.
 export const TIMING = {
-    FRAME_CAPTURE_DELAY: 3000, // Default fallback
-    VIDEO_RECOVERY_INTERVAL: 1000,
-    RESIZE_DEBOUNCE: 50,
-    SUGGESTION_DELAY: 50,
+    FRAME_CAPTURE_DELAY: 3000, // Unused - deprecated in favor of dynamic delays
+    VIDEO_RECOVERY_INTERVAL: 1000, // Unused - no planned feature
+    RESIZE_DEBOUNCE: 50, // Unused - window resize debounce
+    SUGGESTION_DELAY: 50, // Unused - suggestion chip delay
 };
 
 // Quality of Service (QoS) Profiles - Hardware Target Boundaries
+// The app auto-detects GPU capabilities and selects 'low', 'medium', or 'high' tier
+// Frame timing is dynamic: delay = max(TIMING_DELAY_MS, inferenceTime * 1.2)
+// This provides a minimum safety threshold while adapting to actual GPU performance
+// ⚠️  TIMING_DELAY_MS is a minimum floor - actual delays may be longer if inference is slow
 export const QOS_PROFILES = {
     low: {
         MAX_INFERENCE_SIZE: 320,
@@ -101,8 +109,9 @@ export const LANGUAGE_KEYWORDS = {
 
 export const MODEL_CONFIG = {
     MODEL_ID: 'onnx-community/FastVLM-0.5B-ONNX',
-    MAX_NEW_TOKENS: 128, // Used as absolute cap
-    MAX_INFERENCE_SIZE: 640, // Used as absolute cap
+    // ⚠️  These are CEILING values only - actual limits come from QOS_PROFILES per tier
+    MAX_NEW_TOKENS: 128, // Ceiling (used: QOS_PROFILES[tier].MAX_NEW_TOKENS in core-inference.js:211)
+    MAX_INFERENCE_SIZE: 640, // Ceiling (used: QOS_PROFILES[tier].MAX_INFERENCE_SIZE in processing.js:39)
     DEBUG:
         typeof window !== 'undefined' &&
         (window.location.hostname === 'localhost' ||
