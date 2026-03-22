@@ -232,7 +232,7 @@ Vision Transformers tokenize images by partitioning into patches:
 Given an image $\mathbf{I} \in \mathbb{R}^{H \times W \times C}$ and patch size $P$:
 
 $$
-\text{num\_patches} = \frac{HW}{P^2}
+N_{\text{patches}} = \frac{HW}{P^2}
 $$
 
 Each patch $\mathbf{p}_i \in \mathbb{R}^{P^2 \cdot C}$ is linearly projected:
@@ -469,7 +469,7 @@ $$
 Use learned query tokens to compress visual features:
 
 $$
-\mathbf{Q}_{\text{latent}} = \text{LearnableEmbedding}(\text{num\_latents}, d)
+\mathbf{Q}_{\text{latent}} = \text{LearnableEmbedding}(N_{\text{latents}}, d)
 $$
 
 $$
@@ -627,7 +627,7 @@ $$
 User prompt + image tokens:
 
 $$
-\mathbf{X}_{\text{input}} = [\text{[IMG]}, \mathbf{H}_v, \text{[SEP]}, \text{prompt\_tokens}]
+\mathbf{X}_{\text{input}} = [\text{[IMG]}, \mathbf{H}_v, \text{[SEP]}, \text{prompt tokens}]
 $$
 
 **Step 2: Cross-Attention Decoding**
@@ -783,7 +783,7 @@ Update in FP32, cast to FP16 for next iteration:
 $$
 \begin{aligned}
 \theta_{\text{fp32}}^{(t+1)} &= \theta_{\text{fp32}}^{(t)} - \eta \nabla_{\theta}\mathcal{L}_{\text{scaled}} / s \\
-\theta_{\text{fp16}}^{(t+1)} &= \text{cast\_fp16}(\theta_{\text{fp32}}^{(t+1)})
+	heta_{\text{fp16}}^{(t+1)} &= \text{cast}_{\text{fp16}}(\theta_{\text{fp32}}^{(t+1)})
 \end{aligned}
 $$
 
@@ -798,7 +798,7 @@ ONNX represents models as directed acyclic graphs (DAGs):
 **Node Definition:**
 
 $$
-\text{Node} = \{\text{op\_type}, \text{inputs}, \text{outputs}, \text{attributes}\}
+	ext{Node} = \{\text{op type}, \text{inputs}, \text{outputs}, \text{attributes}\}
 $$
 
 **Example: MatMul Node**
@@ -898,7 +898,7 @@ fn matmul(@builtin(global_invocation_id) global_id: vec3<u32>) {
 For $\mathbf{C} \in \mathbb{R}^{M \times N}$ with workgroup size $(16, 16)$:
 
 $$
-\text{num\_workgroups} = \left(\lceil M/16 \rceil, \lceil N/16 \rceil, 1\right)
+N_{\text{workgroups}} = \left(\lceil M/16 \rceil, \lceil N/16 \rceil, 1\right)
 $$
 
 ### 9.4 Memory Bandwidth Optimization
@@ -906,7 +906,7 @@ $$
 **Theoretical Peak Bandwidth:**
 
 $$
-BW_{\text{peak}} = \frac{\text{memory\_clock} \times \text{bus\_width} \times 2}{\text{8 bits/byte}}
+BW_{\text{peak}} = \frac{\text{memory clock} \times \text{bus width} \times 2}{\text{8 bits/byte}}
 $$
 
 For GDDR6 at 14 Gbps with 256-bit bus:
@@ -918,13 +918,13 @@ $$
 **Arithmetic Intensity:**
 
 $$
-AI = \frac{\text{FLOPs}}{\text{bytes\_transferred}}
+AI = \frac{\text{FLOPs}}{\text{bytes transferred}}
 $$
 
 **Roofline Model:**
 
 $$
-\text{Performance} = \min\left(\text{Peak\_FLOPS}, AI \times BW_{\text{peak}}\right)
+	ext{Performance} = \min\left(\text{Peak FLOPS}, AI \times BW_{\text{peak}}\right)
 $$
 
 For MatMul $(M \times K) \times (K \times N)$:
@@ -1077,7 +1077,7 @@ $$
 For sequence length $L$, $L'$ layers, dimension $d$:
 
 $$
-\text{KV\_cache\_size} = 2 \times L' \times L \times d \times 2 \text{ bytes}
+	ext{KV cache size} = 2 \times L' \times L \times d \times 2 \text{ bytes}
 $$
 
 For $L=512$, $L'=8$, $d=512$:
@@ -1097,13 +1097,13 @@ $$
 **GPU Utilization:**
 
 $$
-\text{Utilization} = \frac{\text{Actual\_TFLOPS}}{\text{Peak\_TFLOPS}} \times 100\%
+	ext{Utilization} = \frac{\text{Actual TFLOPS}}{\text{Peak TFLOPS}} \times 100\%
 $$
 
 For RTX 3060 (12.7 TFLOPS FP32):
 
 $$
-\text{Theoretical\_Time} = \frac{2.5 \text{ GFLOPS}}{12700 \text{ GFLOPS}} = 0.2 \text{ ms}
+	ext{Theoretical time} = \frac{2.5 \text{ GFLOPS}}{12700 \text{ GFLOPS}} = 0.2 \text{ ms}
 $$
 
 **Observed Latency:** ~1.5s per decode step
@@ -1138,7 +1138,7 @@ $$
 For batch size $B$, overhead $O$:
 
 $$
-\text{Time}(B) = O + B \times T_{\text{per\_sample}}
+	ext{Time}(B) = O + B \times T_{\text{per sample}}
 $$
 
 But WebGPU memory constraints limit $B \leq 4$ for FastVLM-0.5B.
