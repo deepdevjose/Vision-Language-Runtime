@@ -1,45 +1,73 @@
 # VLM Runtime
 
 > Real-time vision-language model running entirely in your browser  
-> WebGPU • Zero dependencies • Privacy-first
+> **WebGPU • Zero dependencies • 100% Private**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Status](https://img.shields.io/badge/Status-Active-green)
+![Zero Dependencies](https://img.shields.io/badge/Dependencies-0-brightgreen)
+
+## Table of Contents
+
+- [What is this?](#what-is-this)
+- [Why This Matters](#why-this-matters)
+- [How It Works](#how-it-works)
+- [Architecture](#architecture)
+- [Quick Start](#quick-start)
+- [Mobile & HTTPS](#mobile--https-guide)
+- [Features](#features)
+- [Performance Tuning](#performance-tuning)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
 ## What is this?
 
-A browser-based implementation of FastVLM-0.5B that lets you ask questions about what your camera sees. Everything runs locally on your GPU - no servers, no API calls, complete privacy.
+A browser-based implementation of **FastVLM-0.5B** that lets you ask questions about what your camera sees. Everything runs locally on your GPU—no servers, no API calls, complete privacy.
 
-**Translation:** Point your camera at something, ask a question, get an AI response. All happening in your browser because why not.
-
----
-
-## Why?
-
-- **Privacy** — Your camera feed never leaves your device
-- **No API costs** — Runs 100% locally using WebGPU
-- **Learning** — Wanted to see how fast I could make transformers.js
-- **Aesthetic** — Apple/WWDC design language is just *chef's kiss*
+**In simple terms:** Point your camera at something, ask a question, get an instant AI response. All processing happens in your browser.
 
 ---
 
-## How it works
+## Why This Matters
+
+- **🔒 Privacy First** — Your camera feed never leaves your device
+- **💰 Zero API Costs** — Runs 100% locally using WebGPU acceleration
+- **⚡ Fast & Responsive** — Real-time inference with GPU acceleration
+- **📚 Educational** — See how modern vision-language models work in the browser
+- **🎨 Beautiful Design** — Inspired by Apple/WWDC's design language
+
+---
+
+## How It Works
+
+### Processing Pipeline
 
 ```
-Camera → WebGPU → FastVLM-0.5B → Live captions
+📹 Camera Feed → WebGPU Processing → FastVLM-0.5B Model → Live Captions
 ```
 
-**Tech stack:**
-- Vanilla JavaScript (no frameworks, no build tools)
-- WebGPU for GPU acceleration
-- Transformers.js + ONNX Runtime
-- ASCII art background porque se veía cool
+### Technology Stack
 
-**Performance tricks:**
-- Lazy loading (60% faster startup)
-- Frame downscaling to 640px (50% faster inference)
-- Throttled UI updates (100ms intervals)
-- Canvas caching and dimension tracking
-- Abortable async operations
+| Component | Technology |
+|-----------|-----------|
+| **Language** | Vanilla JavaScript (no frameworks) |
+| **GPU Acceleration** | WebGPU |
+| **Model Runtime** | Transformers.js + ONNX Runtime |
+| **UI Design** | CSS + vanilla JS components |
+| **Styling** | Apple-inspired glass morphism design |
+
+### Performance Optimizations
+
+- ✅ **Lazy Loading** — 60% faster startup, models load on-demand
+- ✅ **Frame Downscaling** — 50% faster inference via 640px resolution
+- ✅ **UI Throttling** — Batched updates every 100ms
+- ✅ **Canvas Caching** — Dimension tracking prevents reflows
+- ✅ **Async Control** — Abortable operations for responsive UI
+- ✅ **FP16 Support** — 2-3× speed boost on compatible GPUs
+- ✅ **Dynamic Frame Timing** — Automatic adjustment based on GPU speed
 
 ---
 
@@ -80,12 +108,21 @@ See `src/js/utils/state-machine.js` for full implementation.
 
 ---
 
-## Quick start
+## Quick Start
+
+### Requirements
+
+- ✅ **WebGPU-enabled browser** (Chrome 113+, Edge 113+, Firefox 141+)
+- ✅ **Camera/Webcam** 
+- ✅ **Local server** (file:// protocol not supported)
+- ✅ **HTTPS connection** (or localhost) — required for camera access
+
+Check WebGPU compatibility: [webgpu.io/test](https://webgpu.io/test)
 
 ### Local Development
 
 ```bash
-# Clone the repo
+# Clone the repository
 git clone <repository-url>
 cd Vision-Language-Runtime
 
@@ -93,72 +130,98 @@ cd Vision-Language-Runtime
 cd src
 python -m http.server 8000
 
-# Open browser
+# Open in browser
 http://localhost:8000
 ```
 
-**Requirements:**
-- WebGPU-enabled browser (Chrome 113+, Edge 113+, Firefox 141+)
-- Camera/webcam
-- Local server (no file:// protocol)
-- **HTTPS connection** (or localhost) - required for camera access on mobile devices
+### Production Deployment
 
-### Deploy to Production
-
-**Zero configuration deployment** - no build step needed!
+**No build step required!** Deploy the `src/` directory directly:
 
 ```
-Build command:        (empty)
-Build output directory: src
+Build command:          (empty - no build needed)
+Build output directory: src/
 ```
 
-See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed instructions for Cloudflare Pages, Vercel, Netlify, and more.
+Host on:
+- **Cloudflare Pages** (recommended - free HTTPS + CDN)
+- **Vercel** 
+- **Netlify**
+- **GitHub Pages**
+- Any static file host
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed deployment guides.
 
 ---
 
-## Mobile Usage
+## Mobile & HTTPS Guide
 
-**For mobile devices:**
-- Use HTTPS to access the app (camera doesn't work over HTTP on mobile browsers)
-- On localhost, you can use HTTP for testing
-- Grant camera permissions when prompted
-- The app automatically detects mobile and uses optimized constraints
-- Responsive design works on phones and tablets
+### Mobile Devices
 
-**Testing on mobile (local network):**
+Camera access on mobile requires HTTPS (except localhost). Follow these steps:
+
+#### iOS/Safari
+1. Deploy app to HTTPS (Cloudflare Pages recommended)
+2. Settings → Safari → Camera → Allow
+3. Grant permissions when prompted
+4. Reload page after permissions change
+
+#### Android/Chrome
+1. Navigate via HTTPS
+2. Grant camera permissions
+3. Enable WebGPU support: `chrome://flags` → search "webgpu" → enable developer features
+4. Reload and check console for WebGPU status
+
+### Testing on Local Network
+
 ```bash
-# Find your local IP
-ipconfig  # Windows
-ifconfig  # Mac/Linux
+# Find your machine's IP
+ifconfig          # Mac/Linux
+ipconfig          # Windows
 
-# Start server from src/
-cd src
+# Start server (from src/ directory)
 python -m http.server 8000
 
-# Access from mobile browser
+# Access from mobile on same network
 http://YOUR_LOCAL_IP:8000
 ```
 
-**Recommended:** Deploy to Cloudflare Pages (free) for instant HTTPS and global CDN.
+### Recommended: Deploy to Cloudflare Pages
+
+Get instant HTTPS + global CDN (free tier available):
+1. Push to GitHub
+2. Connect repo to Cloudflare Pages
+3. Set build output directory to `src/`
+4. Auto-deploy on push
+
+**Result:** `https://your-app.pages.dev` with zero build steps
 
 ---
 
 ## Features
 
-- ✨ Real-time visual inference (1-3s per frame)
-- 🎨 Monochromatic glass UI (Apple/WWDC vibes)
-- 🔒 100% on-device processing
-- 📝 Custom prompts for flexible queries + 10 multilingual presets
-- 🎭 Live ASCII art background from camera feed
-- ⚡ GPU-accelerated with WebGPU + FP16 support
-- 📊 Performance optimizations: warmup, dynamic FPS, backpressure
-- � Freeze frame to analyze static images
-- 📜 Caption history (last 20 captions with JSON export)
-- 🎥 Camera switching and auto-recovery with exponential backoff
-- 🔧 Developer tools: diagnostics panel (`Ctrl+Shift+D`), logger, type checking
-- 🔗 Smart URL detection with security confirmation
-- 📱 Enhanced Safari/iOS camera error messages
-- 🖼️ Image upload fallback (for devices without WebGPU)
+### Core Features
+- ✨ **Real-time Inference** — 1-3 seconds per frame (varies by GPU)
+- 🔒 **Private by Default** — 100% on-device processing
+- 🎨 **Glass UI Design** — Apple/WWDC-inspired monochromatic interface
+- ⚡ **GPU Accelerated** — WebGPU + FP16 support for 2-3× speed boost
+
+### Customization
+- 📝 **Custom Prompts** — Ask any question about what the camera sees
+- 🌍 **Multilingual Presets** — 10+ language options for live captions
+- 🎭 **Live ASCII Art** — Psychedelic art background from camera feed
+- 🖼️ **Freeze Frame Analysis** — Pause and analyze static images
+
+### Productivity
+- 📊 **Caption History** — Store last 20 captions with JSON export
+- 🔗 **Smart URL Detection** — Automatic URL recognition with security checks
+- 📱 **Device Optimization** — Auto-detection for iOS/Safari/Android
+- 🎥 **Camera Switching** — Fast switching between front/rear cameras
+
+### Developer Tools
+- 🔧 **Diagnostics Panel** — Press `Ctrl+Shift+D` for real-time stats
+- 📋 **Debug Logger** — Full logging console for troubleshooting
+- ✅ **Type Checking** — TypeScript validation (optional dev tool)
 
 ---
 
@@ -248,74 +311,77 @@ Open browser console on first load - you'll see WebGPU detection results includi
 
 ## Troubleshooting
 
-**WebGPU not available?**  
-Update your browser or check [webgpu.io](https://webgpu.io) for compatibility. The app will automatically switch to image upload mode as a fallback.
+| Issue | Solution |
+|-------|----------|
+| **WebGPU not available** | Update browser to latest version. Check [webgpu.io](https://webgpu.io) for compatibility. App falls back to image upload mode. |
+| **Model won't load** | Clear cache (Ctrl+Shift+Delete), check console for CORS errors, verify internet connection |
+| **Slow performance** | Reduce `MAX_INFERENCE_SIZE` in `src/js/utils/constants.js` or increase `TIMING_DELAY_MS`. Close GPU-intensive apps. |
+| **Camera blocked on mobile** | Make sure using HTTPS (camera requires HTTPS on mobile). Check Settings → Safari → Camera → Allow. Reload page. |
+| **Camera blocked on desktop** | Check browser permissions: Settings → Site Permissions → Camera. Reload page. Try incognito mode. |
+| **"Insecure Connection" warning** | Camera requires HTTPS. Use secure connection or run on localhost for testing. |
+| **URLs in captions aren't clickable** | Click the URL badge to open with security confirmation. Never open untrusted links! |
 
-**Model won't load?**  
-Clear cache, check console for CORS errors, verify internet connection
+### Debug Mode
 
-**Slow performance?**  
-Reduce `MAX_INFERENCE_SIZE` in your hardware tier (320 for low, 480 for medium, 640 for high) or increase `TIMING_DELAY_MS` for more GPU rest time, or close other GPU-intensive apps
+Enable debug logging in `src/js/utils/constants.js`:
 
-**Camera blocked on mobile?**  
-- **Most common:** Not using HTTPS (required on mobile browsers)
-- **Safari/iOS:** Go to Settings → Safari → Camera → Allow
-- Check browser permissions: Settings → Site Permissions → Camera
-- Reload the page after granting permissions
-- Make sure no other app is using the camera
-- Try in incognito mode to rule out extension conflicts
-
-**Camera blocked on desktop?**  
-Check browser permissions and reload. See detailed error messages in the UI for specific guidance.
-
-**"Insecure Connection" warning?**  
-Camera access requires HTTPS. Use `https://` or run on `localhost` for testing
-
-**URLs in captions?**  
-Click the URL badge to open with security confirmation. Never open untrusted links!
-
----
-
-## Developer Tools (Optional)
-
-The project includes optional development tools for testing and type checking:
-
-```bash
-# Install dev dependencies (optional - not needed for deployment)
-npm install
-
-# Run tests (optional)
-npm run test:unit      # Unit tests
-npm run test:e2e       # E2E tests with Playwright
-npm run type-check     # TypeScript type checking
+```javascript
+MODEL_CONFIG.DEBUG = true  // Auto-enabled on localhost
 ```
 
-**Important:** These are **only for development**. The production app has **zero dependencies** and runs as pure static HTML/CSS/JS.
+Open browser DevTools (F12) to see detailed logs for:
+- GPU detection
+- Model loading
+- Inference timing
+- State transitions
+- Error details
 
 ---
 
-## Credits
+## Credits & Attribution
 
-**Model & Framework:**
-- [Apple/FastVLM-0.5B](https://huggingface.co/apple/FastVLM-0.5B) by Apple Research
-- [Transformers.js](https://huggingface.co/docs/transformers.js) by Hugging Face
+**Base Model & Framework:**
+- [Apple/FastVLM-0.5B](https://huggingface.co/apple/FastVLM-0.5B) — Efficient vision-language model by Apple Research
+- [Transformers.js](https://huggingface.co/docs/transformers.js) — JavaScript runtime by Hugging Face
+- [ONNX Runtime Web](https://github.com/microsoft/onnx-runtime) — Inference engine
 
-**This version:**
-- Rewritten in vanilla JS by a devdepressed or whatever my name so doing things
-- No frameworks. I hate `npm install`. It's just me, WebGPU, and the model. No middlemen.
-- Performance optimizations porque mi GPU no es tan buena
-- Apple aesthetic porque me gusta cómo se ve
+**Implementation:**
+- Browser-native implementation in Vanilla JavaScript
+- Zero external dependencies in production
+- Performance optimizations for GPU efficiency
+- Apple-inspired design language
+
+---
+
+## Contributing
+
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Development Setup
+
+```bash
+# Optional: Install dev dependencies (for testing only)
+npm install
+
+# Run tests
+npm run test:unit      # Unit tests
+npm run test:e2e       # E2E tests with Playwright
+npm run type-check     # TypeScript validation
+
+# Start development server
+cd src && python -m http.server 8000
+```
+
+**Note:** Development tools are optional. The production app has **zero external dependencies**.
 
 ---
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+Licensed under the [MIT License](LICENSE). See LICENSE file for details.
 
-If you copy, modify, or redistribute this project (or substantial portions of it), keep the copyright notice and full license text included, as required by MIT.
-
-**Model License:** FastVLM-0.5B has its own license terms in the Hugging Face repository and is separate from this project's MIT license.
+**Model License:** FastVLM-0.5B is subject to its own license terms on [Hugging Face](https://huggingface.co/apple/FastVLM-0.5B).
 
 ---
 
-Made with ☕ and questionable life choices
+Made with ☕ and questionable engineering decisions
