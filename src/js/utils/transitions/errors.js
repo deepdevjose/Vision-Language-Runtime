@@ -64,7 +64,7 @@ export const errorTransitions = [
         /** @this {import('../state-machine.js').default} */
         action: function () {
             this.state.error = null;
-            this.state.runtimeState = 'idle';
+            this.state.runtimeState = RUNTIME_STATES.IDLE;
         },
     },
 ];

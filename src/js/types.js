@@ -77,6 +77,14 @@
 /**
  * Constants for ViewState values
  * Must be synchronized with state-machine.js ViewState typedef
+ * @type {Readonly<{
+ *   WELCOME: 'welcome',
+ *   PERMISSION: 'permission',
+ *   LOADING: 'loading',
+ *   RUNTIME: 'runtime',
+ *   ERROR: 'error',
+ *   IMAGE_UPLOAD: 'image-upload'
+ * }>}
  */
 export const VIEW_STATES = {
     WELCOME: 'welcome',
@@ -89,6 +97,14 @@ export const VIEW_STATES = {
 
 /**
  * Constants for RuntimeState values
+ * @type {Readonly<{
+ *   IDLE: 'idle',
+ *   WARMING: 'warming',
+ *   RUNNING: 'running',
+ *   PAUSED: 'paused',
+ *   RECOVERING: 'recovering',
+ *   FAILED: 'failed'
+ * }>}
  */
 export const RUNTIME_STATES = {
     IDLE: 'idle',
@@ -101,6 +117,12 @@ export const RUNTIME_STATES = {
 
 /**
  * Constants for LoadingPhase values
+ * @type {Readonly<{
+ *   LOADING_MODEL: 'loading-model',
+ *   LOADING_WGPU: 'loading-wgpu',
+ *   WARMING_UP: 'warming-up',
+ *   COMPLETE: 'complete'
+ * }>}
  */
 export const LOADING_PHASES = {
     LOADING_MODEL: 'loading-model',
