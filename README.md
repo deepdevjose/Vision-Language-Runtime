@@ -279,9 +279,11 @@ npm run type-check     # TypeScript type checking
 
 ## License
 
-Attribution License — You can use this but you **must** give credit (see LICENSE file)
+This project is licensed under the [MIT License](LICENSE).
 
-**Model License:** FastVLM-0.5B has its own license terms (see Hugging Face repo)
+If you copy, modify, or redistribute this project (or substantial portions of it), keep the copyright notice and full license text included, as required by MIT.
+
+**Model License:** FastVLM-0.5B has its own license terms in the Hugging Face repository and is separate from this project's MIT license.
 
 ---
 
