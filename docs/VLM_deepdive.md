@@ -4,12 +4,12 @@
 
 **Author:** Jose Manuel Cortes Ceron (deepdevjose at gh)
 **Date:** February 2026  
-**Major:** Computer Science Research at Xi'an Jiaotong Liverpool University
+**Major:** High Performance Computing | Xi'an Jiaotong Liverpool University - Instituto Tecnológico Superior del Occidente del Estado de Hidalgo
 
 ---
 
 ## Table of Contents
-
+0. [Modularization Summary](#modularization-summary)
 1. [Introduction](#1-introduction)
 2. [Mathematical Foundations](#2-mathematical-foundations)
 3. [Vision Encoder Architecture](#3-vision-encoder-architecture)
@@ -21,6 +21,63 @@
 9. [ONNX Runtime & WebGPU](#9-onnx-runtime--webgpu)
 10. [Performance Analysis](#10-performance-analysis)
 11. [Future Directions](#11-future-directions)
+
+---
+## Modularization Summary
+
+```mermaid
+graph TB
+    subgraph VL["VLM Service Orchestrator"]
+        VLS["VLMService<br/>(Facade)"]
+    end
+    
+    subgraph Modules["Core Modules"]
+        CI["CoreInference<br/>- loadModel<br/>- performWarmup<br/>- runModelGenerate<br/>- Lock Management"]
+        IP["ImageProcessor<br/>- captureFrame<br/>- getRawImage<br/>- prepareChatMessages<br/>- preparePrompt"]
+        TS["TelemetryService<br/>- recordInferenceTime<br/>- getDynamicFrameDelay<br/>- getEstimatedFPS<br/>- Performance Metrics"]
+    end
+    
+    subgraph Plugins["Plugin Modules"]
+        QR["QRCodeService<br/>- detectQRCode<br/>- generateQRContext<br/>- Browser Detection"]
+    end
+    
+    subgraph External["External Dependencies"]
+        HF["Hugging Face<br/>Transformers"]
+        GPU["WebGPU<br/>Detector"]
+        BD["BarcodeDetector<br/>API"]
+    end
+    
+    subgraph Consumers["Consumers"]
+        LS["Loading Screen"]
+        CV["Captioning View"]
+        DP["Diagnostics Panel"]
+    end
+    
+    VLS -->|orchestrates| CI
+    VLS -->|orchestrates| IP
+    VLS -->|orchestrates| TS
+    VLS -->|orchestrates| QR
+    
+    CI -->|uses| HF
+    CI -->|uses| GPU
+    
+    IP -->|uses| HF
+    
+    QR -->|uses| BD
+    
+    LS -->|calls| VLS
+    CV -->|calls| VLS
+    DP -->|calls| VLS
+    
+    style VLS fill:#4a90e2,stroke:#2e5c8a,color:#fff,stroke-width:3px
+    style CI fill:#50c878,stroke:#2d7a4a,color:#fff
+    style IP fill:#50c878,stroke:#2d7a4a,color:#fff
+    style TS fill:#50c878,stroke:#2d7a4a,color:#fff
+    style QR fill:#ffb84d,stroke:#cc8833,color:#fff
+    style HF fill:#e8eef5,stroke:#4a90e2,color:#333
+    style GPU fill:#e8eef5,stroke:#4a90e2,color:#333
+    style BD fill:#e8eef5,stroke:#4a90e2,color:#333
+```
 
 ---
 

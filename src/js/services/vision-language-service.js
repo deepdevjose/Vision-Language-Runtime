@@ -1,411 +1,157 @@
 // @ts-check
 /**
  * VLM (Vision Language Model) Service
- * Handles loading and running inference with FastVLM model
+ * Main orchestrator that coordinates all VLM-related modules:
+ * - core-inference: Model loading and inference execution
+ * - processing: Image processing and pre/post-processing
+ * - telemetry: Performance monitoring and QoS
+ * - plugins/qr-service: QR code detection
  */
 
-// @ts-ignore
-import { AutoProcessor, AutoModelForImageTextToText, RawImage, TextStreamer } from '@huggingface/transformers';
-import { MODEL_CONFIG, QOS_PROFILES, TIMING } from '../utils/constants.js';
-import webgpuDetector from '../utils/webgpu-detector.js';
+import coreInference from './core-inference.js';
+import imageProcessor from './processing.js';
+import telemetryService from './telemetry.js';
+import qrService from './plugins/qr-service.js';
 
 class VLMService {
     constructor() {
-        this.processor = null;
-        this.model = null;
-        this.isLoaded = false;
-        this.isLoading = false;
-        this.loadPromise = null;
-        this.inferenceLock = false;
-        this.canvas = null;
-        this.ctx = null;  // Cache canvas context
-        this.warmedUp = false;
-        this.lastInferenceTime = 0;
-        this.avgInferenceTime = 3000; // Initial estimate: 3s
-        this.inferenceHistory = []; // Track last 5 inference times
-        this.cachedRawImage = null;
-        this.performanceTier = 'high'; // Default assumption until detected
+        this.coreInference = coreInference;
+        this.imageProcessor = imageProcessor;
+        this.telemetry = telemetryService;
+        this.qrService = qrService;
     }
 
+    /**
+     * Load model and processor
+     * Delegates to core inference module
+     */
     async loadModel(onProgress) {
-        if (this.isLoaded) {
-            onProgress?.('Model already loaded!');
-            return;
-        }
-
-        if (this.loadPromise) {
-            return this.loadPromise;
-        }
-
-        this.isLoading = true;
-        
-        // Track progress for multiple files
-        const fileProgress = new Map();
-
-        this.loadPromise = (async () => {
-            try {
-                // Detect WebGPU and FP16 support before loading model
-                performance.mark('vlm:model-load-start');
-                onProgress?.('Detecting GPU capabilities...', 5);
-                const gpuInfo = await webgpuDetector.detect();
-
-                if (!gpuInfo.supported) {
-                    throw new Error('WebGPU not supported on this device/browser');
-                }
-
-                // Show performance estimate
-                const perfEstimate = webgpuDetector.getPerformanceEstimate();
-                this.performanceTier = perfEstimate.tier;
-                
-                console.log(`⚡ Detected Hardware Tier: ${this.performanceTier.toUpperCase()} tier (${perfEstimate.expectedLatency})`);
-                if (perfEstimate.recommendations.length > 0) {
-                    console.log('💡 Recommendations:');
-                    perfEstimate.recommendations.forEach(rec => console.log(`   ${rec}`));
-                }
-
-                onProgress?.('Loading processor...', 10);
-                this.processor = await AutoProcessor.from_pretrained(MODEL_CONFIG.MODEL_ID);
-                performance.mark('vlm:processor-loaded');
-
-                onProgress?.('Processor loaded. Loading model...', 20);
-                this.model = await AutoModelForImageTextToText.from_pretrained(MODEL_CONFIG.MODEL_ID, {
-                    dtype: {
-                        embed_tokens: 'fp16',
-                        vision_encoder: 'q4',
-                        decoder_model_merged: 'q4'
-                    },
-                    device: 'webgpu',
-                    progress_callback: (data) => {
-                        if (data.status === 'progress') {
-                            const fileName = data.file || 'unknown';
-                            const progress = data.progress || 0;
-
-                            fileProgress.set(fileName, progress);
-
-                            // Calculate overall progress
-                            const progressValues = Array.from(fileProgress.values());
-                            const avgProgress = progressValues.reduce((a, b) => a + b, 0) / progressValues.length;
-                            const overallPercent = Math.round(avgProgress);
-
-                            onProgress?.(`Downloading model files... (${fileProgress.size} files)`, 20 + (overallPercent * 0.6));
-                        }
-                    }
-                });
-
-                onProgress?.('Model loaded successfully!', 80);
-                this.isLoaded = true;
-                performance.mark('vlm:model-weights-loaded');
-
-                // Warmup: Run 1-2 dummy inferences to stabilize latencies
-                onProgress?.('Warming up inference pipeline...', 85);
-                await this.performWarmup();
-                onProgress?.('Warmup complete!', 95);
-                performance.mark('vlm:model-load-end');
-                
-                try {
-                    performance.measure('Model Load Total', 'vlm:model-load-start', 'vlm:model-load-end');
-                    performance.measure('Processor Load', 'vlm:model-load-start', 'vlm:processor-loaded');
-                    performance.measure('Weights Download/Load', 'vlm:processor-loaded', 'vlm:model-weights-loaded');
-                    
-                    if (MODEL_CONFIG.DEBUG) {
-                        const totalMatch = performance.getEntriesByName('Model Load Total').pop();
-                        console.log(`⏱️ Total Model Load: ${(totalMatch.duration / 1000).toFixed(2)}s`);
-                    }
-                } catch(e) {}
-            } catch (error) {
-                console.error('Error loading model:', error);
-                throw error;
-            } finally {
-                this.isLoading = false;
-                this.loadPromise = null;
-            }
-        })();
-
-        return this.loadPromise;
+        return this.coreInference.loadModel(onProgress);
     }
 
+    /**
+     * Perform warmup (can be called separately if needed)
+     * Delegates to core inference module
+     */
     async performWarmup() {
-        if (this.warmedUp) return;
-
-        try {
-            console.log('🔥 Starting model warmup...');
-
-            // Create dummy canvas with small test image
-            const warmupCanvas = document.createElement('canvas');
-            warmupCanvas.width = 320;
-            warmupCanvas.height = 240;
-            const ctx = warmupCanvas.getContext('2d');
-            ctx.fillStyle = '#808080';
-            ctx.fillRect(0, 0, 320, 240);
-
-            // Create dummy video element
-            const dummyVideo = document.createElement('video');
-            dummyVideo.width = 320;
-            dummyVideo.height = 240;
-
-            // Simple dummy prompt
-            const dummyPrompt = 'Describe this.';
-
-            // Run 2 warmup inferences
-            for (let i = 0; i < 2; i++) {
-                const startTime = performance.now();
-                await this._runInferenceCore(warmupCanvas, dummyPrompt, null, true);
-                const elapsed = performance.now() - startTime;
-                console.log(`🔥 Warmup inference ${i + 1}/2 completed in ${(elapsed / 1000).toFixed(2)}s`);
-            }
-
-            this.warmedUp = true;
-            console.log('✅ Warmup complete - inference pipeline stabilized');
-        } catch (error) {
-            console.warn('⚠️ Warmup failed (non-critical):', error);
-            // Don't throw - warmup failure is not critical
-        }
+        return this.coreInference.performWarmup();
     }
 
+    /**
+     * Get inference lock status (for external visibility)
+     */
+    get inferenceLock() {
+        return this.coreInference.inferenceLock;
+    }
+
+    /**
+     * Run inference on video frame
+     * Coordinates all modules to process frame and generate caption
+     */
     async runInference(video, instruction, onTextUpdate) {
-        // Prevents concurrent inference calls (GPU doesn't like multitasking this hard)
-        if (this.inferenceLock) {
-            if (MODEL_CONFIG.DEBUG) console.warn('⚠️ Inference already running, skipping frame');
+        // Acquire inference lock (prevents concurrent inference calls)
+        if (!this.coreInference.acquireInferenceLock()) {
             return '';
         }
 
-        this.inferenceLock = true;
         const startTime = performance.now();
-        if (MODEL_CONFIG.DEBUG) console.log('🔒 Inference lock acquired');
-
-        if (!this.processor || !this.model) {
-            this.inferenceLock = false;
-            if (MODEL_CONFIG.DEBUG) console.log('🔓 Inference lock released (no model)');
-            throw new Error('Model/processor not loaded');
-        }
 
         try {
             performance.mark('vlm:inference-start');
-            const result = await this._runInferenceCore(video, instruction, onTextUpdate, false);
+
+            // Initialize QR service on first run
+            if (!this.qrService.initialized) {
+                await this.qrService.initialize();
+            }
+
+            // Step 1: Capture and process frame
+            const performanceTier = this.coreInference.getPerformanceTier();
+            const canvas = this.imageProcessor.captureFrame(video, performanceTier);
+
+            // Step 2: Detect QR codes (if available)
+            let qrContext = '';
+            if (this.qrService.isAvailable()) {
+                const qrUrl = await this.qrService.detectQRCode(canvas);
+                if (qrUrl) {
+                    qrContext = this.qrService.generateQRContext(qrUrl);
+                }
+            }
+
+            // Step 3: Prepare processing inputs
+            const messages = this.imageProcessor.prepareChatMessages(instruction, performanceTier, qrContext);
+            const processor = this.coreInference.getProcessor();
+            const prompt = this.imageProcessor.preparePrompt(
+                processor.apply_chat_template.bind(processor),
+                messages
+            );
+
+            // Step 4: Run model inference
+            performance.mark('vlm:post-processing-start');
+            const result = await this.coreInference.runModelGenerate(canvas, prompt, onTextUpdate, false);
             performance.mark('vlm:inference-end');
-            
+
+            // Step 5: Record telemetry
+            const elapsedTime = performance.now() - startTime;
+            this.telemetry.recordInferenceTime(elapsedTime);
+
             try {
-                performance.measure('Total Inference', 'vlm:inference-start', 'vlm:inference-end');
+                this.telemetry.measure('Total Inference', 'vlm:inference-start', 'vlm:inference-end');
+                this.telemetry.measure('Image Processing', 'vlm:post-processing-start', 'vlm:model-execution-start');
             } catch(e) {}
 
-            // Track inference time for dynamic FPS adjustment
-            const elapsedTime = performance.now() - startTime;
-            this.lastInferenceTime = elapsedTime;
-            this.inferenceHistory.push(elapsedTime);
-            if (this.inferenceHistory.length > 5) {
-                this.inferenceHistory.shift();
-            }
-            this.avgInferenceTime = this.inferenceHistory.reduce((a, b) => a + b, 0) / this.inferenceHistory.length;
-
-            if (MODEL_CONFIG.DEBUG) console.log(`⏱️ Inference took ${(elapsedTime / 1000).toFixed(2)}s (avg: ${(this.avgInferenceTime / 1000).toFixed(2)}s)`);
-
-            this.inferenceLock = false;
-            if (MODEL_CONFIG.DEBUG) console.log('🔓 Inference lock released (success)');
             return result;
         } catch (error) {
             console.error('❌ Inference error:', error);
-            this.inferenceLock = false;
-            if (MODEL_CONFIG.DEBUG) console.log('🔓 Inference lock released (error)');
             throw error;
+        } finally {
+            this.coreInference.releaseInferenceLock();
         }
     }
-
-    async _runInferenceCore(video, instruction, onTextUpdate, isWarmup = false) {
-        if (!isWarmup && MODEL_CONFIG.DEBUG) console.log('🎥 Starting inference with prompt:', instruction);
-
-        // Initialize BarcodeDetector once if supported
-        if (!this.barcodeDetector && 'BarcodeDetector' in window) {
-            try {
-                this.barcodeDetector = new (/** @type {any} */(window).BarcodeDetector)({ formats: ['qr_code'] });
-            } catch (err) {
-                console.warn('BarcodeDetector initialization failed:', err);
-            }
-        }
-
-        // Create canvas if it doesn't exist
-        if (!this.canvas) {
-            this.canvas = document.createElement('canvas');
-            this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
-        }
-
-        // Calculate scaled dimensions to reduce inference cost
-        // Keep aspect ratio but limit max dimension to MAX_INFERENCE_SIZE
-        // (640px is the sweet spot - tested higher values, GPU starts crying)
-        //
-        // Fallback chain: videoWidth (video) → width (canvas) → 320
-        // This allows warmup to pass a canvas instead of a video element.
-        const videoWidth = video.videoWidth || video.width || 320;
-        const videoHeight = video.videoHeight || video.height || 240;
-        
-        // Map extraction constraints based on Hardware Performance Tier
-        const currentProfile = QOS_PROFILES[this.performanceTier] || QOS_PROFILES.high;
-        const maxSize = currentProfile.MAX_INFERENCE_SIZE;
-
-        let canvasWidth, canvasHeight;
-        if (videoWidth > videoHeight) {
-            if (videoWidth > maxSize) {
-                canvasWidth = maxSize;
-                canvasHeight = Math.round((videoHeight / videoWidth) * maxSize);
-            } else {
-                canvasWidth = videoWidth;
-                canvasHeight = videoHeight;
-            }
-        } else {
-            if (videoHeight > maxSize) {
-                canvasHeight = maxSize;
-                canvasWidth = Math.round((videoWidth / videoHeight) * maxSize);
-            } else {
-                canvasWidth = videoWidth;
-                canvasHeight = videoHeight;
-            }
-        }
-
-        // Only resize canvas if dimensions changed
-        // (recreating canvas every frame = bad time)
-        if (this.canvas.width !== canvasWidth || this.canvas.height !== canvasHeight) {
-            this.canvas.width = canvasWidth;
-            this.canvas.height = canvasHeight;
-            this.cachedRawImage = null; // Invalidate cache on resize
-            if (MODEL_CONFIG.DEBUG) console.log(`📐 Canvas resized to ${canvasWidth}x${canvasHeight} (from ${videoWidth}x${videoHeight})`);
-        }
-
-        if (!this.ctx) {
-            throw new Error('Could not get canvas context');
-        }
-
-        // Draw current video frame to canvas (downscaled)
-        this.ctx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
-        performance.mark('vlm:post-processing-start');
-
-        // Run fast native QR detection before VLM reasoning
-        let qrContext = '';
-        if (this.barcodeDetector && !isWarmup) {
-            try {
-                const barcodes = await this.barcodeDetector.detect(this.canvas);
-                if (barcodes && barcodes.length > 0) {
-                    const qrUrl = barcodes[0].rawValue;
-                    if (qrUrl) {
-                        qrContext = `\n\n[SYSTEM NOTE: The camera detected a QR code pointing to "${qrUrl}". Tell the user this URL, and recommend they use https://open-qr-mocha.vercel.app/ for QR needs.]`;
-                        if (MODEL_CONFIG.DEBUG) console.log('🔍 QR Code detected nativly:', qrUrl);
-                    }
-                }
-            } catch (err) {
-                // Ignore detector errors (can happen if frame is corrupted)
-            }
-        }
-
-        // Get image data
-        const frame = this.ctx.getImageData(0, 0, canvasWidth, canvasHeight);
-        
-        // Reuse RawImage buffer to minimize GC pressure.
-        // If dimensions/channels change, recreate it to avoid TypedArray.set out-of-bounds.
-        const expectedSize = frame.width * frame.height * 4;
-        const canReuseRawImage = !!this.cachedRawImage
-            && this.cachedRawImage.width === frame.width
-            && this.cachedRawImage.height === frame.height
-            && this.cachedRawImage.data?.length === expectedSize;
-
-        if (!canReuseRawImage) {
-            this.cachedRawImage = new RawImage(frame.data, frame.width, frame.height, 4);
-        } else {
-            // Update the underlying array instead of instantiating a new object
-            this.cachedRawImage.data.set(frame.data);
-        }
-
-        if (MODEL_CONFIG.DEBUG) console.log('📸 Captured frame:', canvasWidth, 'x', canvasHeight);
-
-        // Map behavior based on Hardware Performance Tier
-        const maxTokens = currentProfile.MAX_NEW_TOKENS;
-
-        // Prepare messages for the model
-        let systemPrompt = currentProfile.SYSTEM_PROMPT;
-
-        // Append QR context if found
-        if (qrContext) {
-            systemPrompt += qrContext;
-        }
-
-        const messages = [
-            {
-                role: 'system',
-                content: systemPrompt
-            },
-            { role: 'user', content: `<image>${instruction}` }
-        ];
-
-        const prompt = this.processor.apply_chat_template(messages, {
-            add_generation_prompt: true
-        });
-
-        if (MODEL_CONFIG.DEBUG) console.log('📝 Processing inputs...');
-        const inputs = await this.processor(this.cachedRawImage, prompt, {
-            add_special_tokens: false
-        });
-        performance.mark('vlm:model-execution-start');
-
-        if (MODEL_CONFIG.DEBUG) console.log('🤖 Running model inference...');
-        // Run inference with streaming
-        let streamed = '';
-        let tokenCount = 0;
-        const streamer = new TextStreamer(this.processor.tokenizer, {
-            skip_prompt: true,
-            skip_special_tokens: true,
-            callback_function: (token) => {
-                streamed += token;
-                tokenCount++;
-                // Only log every 5th token if DEBUG enabled to reduce noise
-                if (MODEL_CONFIG.DEBUG && tokenCount % 5 === 0) {
-                    console.log(`📤 Streaming... (${tokenCount} tokens)`);
-                }
-                onTextUpdate?.(streamed.trim());
-            }
-        });
-
-        const outputs = await this.model.generate({
-            ...inputs,
-            max_new_tokens: maxTokens,
-            do_sample: false,
-            streamer,
-            repetition_penalty: 1.2
-        });
-
-        if (MODEL_CONFIG.DEBUG && !isWarmup) console.log(`✅ Model output generated (${maxTokens} max tokens)`);
-        
-        try {
-            performance.measure('Image Processing', 'vlm:post-processing-start', 'vlm:model-execution-start');
-            performance.measure('Model Execution', 'vlm:model-execution-start', 'vlm:inference-end');
-        } catch(e) {}
-
-        // If streaming worked, use that result to avoid redundant decoding
-        const finalText = streamed.trim() || this.processor.batch_decode(
-            outputs.slice(null, [inputs.input_ids.dims.at(-1), null]),
-            { skip_special_tokens: true }
-        )[0].trim();
-
-        if (MODEL_CONFIG.DEBUG && !isWarmup) console.log('💬 Final caption:', finalText);
-
-        return finalText;
-    }
-
+    /**
+     * Get dynamic frame delay based on current performance
+     */
     getDynamicFrameDelay() {
-        const currentProfile = QOS_PROFILES[this.performanceTier] || QOS_PROFILES.high;
-        
-        // Calculate optimal delay based on average inference time (add 20% breathing room buffer),
-        // but never drop below the hardware profile's safety threshold ceiling.
-        const recommendedDelay = Math.max(
-            currentProfile.TIMING_DELAY_MS,
-            this.avgInferenceTime * 1.2
-        );
-        return recommendedDelay;
+        const performanceTier = this.coreInference.getPerformanceTier();
+        return this.telemetry.getDynamicFrameDelay(performanceTier);
     }
 
+    /**
+     * Get model loaded state
+     */
     getLoadedState() {
+        const coreState = this.coreInference.getLoadedState();
+        const telemetryData = this.telemetry.getTelemetrySummary();
+        
         return {
-            isLoaded: this.isLoaded,
-            isLoading: this.isLoading,
-            warmedUp: this.warmedUp,
-            avgInferenceTime: this.avgInferenceTime
+            isLoaded: coreState.isLoaded,
+            isLoading: coreState.isLoading,
+            warmedUp: coreState.warmedUp,
+            avgInferenceTime: telemetryData.avgInferenceTime,
+            lastInferenceTime: telemetryData.lastInferenceTime,
+            performanceTier: this.coreInference.getPerformanceTier()
         };
+    }
+
+    /**
+     * Get telemetry summary
+     */
+    getTelemetrySummary() {
+        return this.telemetry.getTelemetrySummary();
+    }
+
+    /**
+     * Get estimated FPS
+     */
+    getEstimatedFPS() {
+        const performanceTier = this.coreInference.getPerformanceTier();
+        return this.telemetry.getEstimatedFPS(performanceTier);
+    }
+
+    /**
+     * Get QR service status
+     */
+    getQRServiceStatus() {
+        return this.qrService.getStatus();
     }
 }
 
