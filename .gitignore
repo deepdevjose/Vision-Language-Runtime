@@ -58,3 +58,29 @@ logs/
 test-results/
 playwright-report/
 playwright/.cache/
+
+# Cloudflare Pages
+.cfignore
+
+# IDE local settings
+.vscode/settings.json.local
+.vscode/launch.json
+.vscode/tasks.json
+
+# macOS Finder
+.AppleDouble
+.LSOverride
+
+# System files
+*.bak
+*.backup
+*.$$$
+
+# IDE/Editor caches
+.history/
+*.vsix
+
+# Development artifacts
+*.pem
+*.key
+*.cert
