@@ -9,6 +9,11 @@ export class QRCodeService {
     constructor() {
         this.barcodeDetector = null;
         this.initialized = false;
+        this.lastScanAt = 0;
+        this.scanIntervalMs = 1200;
+        this.lastDetectedValue = '';
+        this.lastDetectedAt = 0;
+        this.detectedValueTtlMs = 8000;
     }
 
     /**
@@ -42,11 +47,23 @@ export class QRCodeService {
             return '';
         }
 
+        const now = performance.now();
+        const cachedStillValid =
+            !!this.lastDetectedValue && now - this.lastDetectedAt < this.detectedValueTtlMs;
+
+        if (now - this.lastScanAt < this.scanIntervalMs) {
+            return cachedStillValid ? this.lastDetectedValue : '';
+        }
+
+        this.lastScanAt = now;
+
         try {
             const barcodes = await this.barcodeDetector.detect(canvas);
             if (barcodes && barcodes.length > 0) {
                 const qrUrl = barcodes[0].rawValue;
                 if (qrUrl) {
+                    this.lastDetectedValue = qrUrl;
+                    this.lastDetectedAt = performance.now();
                     if (MODEL_CONFIG.DEBUG) console.log('🔍 QR Code detected:', qrUrl);
                     return qrUrl;
                 }
@@ -56,7 +73,7 @@ export class QRCodeService {
             if (MODEL_CONFIG.DEBUG) console.warn('⚠️ QR detection error:', err.message);
         }
 
-        return '';
+        return cachedStillValid ? this.lastDetectedValue : '';
     }
 
     /**

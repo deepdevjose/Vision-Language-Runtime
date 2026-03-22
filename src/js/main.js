@@ -16,7 +16,6 @@ import { createLoadingScreen } from './components/loading-screen.js';
 import { createCaptioningView } from './components/captioning-view.js';
 import { createImageUpload, fileToCanvas } from './components/image-upload.js';
 import { createErrorScreen } from './components/error-screen.js';
-import { createAsciiBackground } from './components/ascii-background.js';
 import { createDiagnosticsPanel } from './components/diagnostics-panel.js';
 import { getStream, onStreamEnded, getCameraErrorMessage } from './services/webcam-service.js';
 import webgpuDetector from './utils/webgpu-detector.js';
@@ -73,7 +72,6 @@ const root = document.getElementById('root');
 let videoElement = null;
 let currentComponent = null;
 let currentStream = null; // Prevents unnecessary srcObject reassignments
-let asciiBackground = null;
 let previousViewState = null; // Tracks last rendered view to skip redundant rebuilds
 
 // =============================
@@ -197,12 +195,6 @@ function render(state) {
         currentComponent.cleanup();
     }
 
-    // ASCII background needs manual cleanup (canvas contexts don't GC immediately)
-    if (asciiBackground) {
-        asciiBackground.cleanup();
-        asciiBackground = null;
-    }
-
     // Background layer always present
     const bgLayer = createElement('div', {
         className: 'absolute inset-0 bg-gray-900',
@@ -269,12 +261,6 @@ function render(state) {
             break;
 
         case VIEW_STATES.RUNTIME:
-            // ASCII art background (6% opacity, totally optional but looks sick)
-            if (videoElement && isVideoReady) {
-                asciiBackground = createAsciiBackground(videoElement);
-                // Will be inserted first in the final DOM rebuild
-            }
-
             currentComponent = createCaptioningView(videoElement);
             break;
 
@@ -345,17 +331,7 @@ function render(state) {
     // Layer 1: Background
     root.appendChild(bgLayer);
 
-    // Layer 2: ASCII background (runtime only, goes behind video)
-    if (asciiBackground) {
-        root.appendChild(asciiBackground.element);
-        // Delayed activation for smooth transition
-        setTimeout(() => {
-            asciiBackground.element.classList.add('active');
-            asciiBackground.start();
-        }, 500);
-    }
-
-    // Layer 3: Video background (not needed in runtime — captioning-view manages its own video)
+    // Layer 2: Video background (not needed in runtime — captioning-view manages its own video)
     if (webcamStream && viewState !== 'runtime') {
         const video = createVideoElement();
         if (video.srcObject !== webcamStream) {
@@ -368,12 +344,12 @@ function render(state) {
         root.appendChild(video);
     }
 
-    // Layer 4: Overlay
+    // Layer 3: Overlay
     if (overlay) {
         root.appendChild(overlay);
     }
 
-    // Layer 5: Component
+    // Layer 4: Component
     if (currentComponent) {
         root.appendChild(currentComponent);
     }
@@ -436,6 +412,135 @@ logger.info('Vision-Language Runtime initialized', {
 // Expose diagnostics panel globally for console access
 /** @type {any} */ (window).__VLM_DIAGNOSTICS__ = diagnosticsPanel;
 /** @type {any} */ (window).__VLM_LOGGER__ = logger;
+
+/**
+ * Global safety net for WebGPU device loss errors emitted outside awaited call stacks.
+ * Some lower-level GPU promises can reject asynchronously (e.g., mapAsync on lost devices).
+ */
+window.addEventListener('unhandledrejection', (event) => {
+    const message = String(event.reason?.message || event.reason || '').toLowerCase();
+    const isDeviceLost =
+        message.includes('device is lost') ||
+        message.includes('gpu device') ||
+        message.includes('mapasync') ||
+        message.includes('aborterror');
+
+    if (!isDeviceLost) {
+        return;
+    }
+
+    event.preventDefault();
+
+    const reason = String(event.reason?.message || event.reason || 'Unknown WebGPU rejection');
+    const now = Date.now();
+    const cooldownMs = 2 * 60 * 1000;
+
+    if (!window.__VLM_GPU_RECOVERY_META__) {
+        window.__VLM_GPU_RECOVERY_META__ = {
+            attempts: 0,
+            lastAttemptAt: 0,
+        };
+    }
+
+    const recoveryMeta = window.__VLM_GPU_RECOVERY_META__;
+
+    if (now - recoveryMeta.lastAttemptAt > cooldownMs) {
+        recoveryMeta.attempts = 0;
+    }
+
+    if (window.__VLM_GPU_RECOVERY_IN_PROGRESS__) {
+        logger.warn('WebGPU device-loss rejection received while recovery is already running');
+        return;
+    }
+
+    if (recoveryMeta.attempts >= 2) {
+        logger.error('WebGPU auto-recovery budget exhausted; escalating to fatal error', {
+            reason,
+        });
+        stateMachine.dispatch('FATAL_ERROR', {
+            code: 'WEBGPU_DEVICE_LOST',
+            message: 'GPU device was lost. Reload the runtime to recover WebGPU.',
+            technical: String(event.reason?.stack || event.reason || 'No stack trace available'),
+            recoverAction: {
+                label: 'Reload Runtime',
+                handler: () => window.location.reload(),
+            },
+        });
+        return;
+    }
+
+    window.__VLM_GPU_RECOVERY_IN_PROGRESS__ = true;
+    recoveryMeta.attempts += 1;
+    recoveryMeta.lastAttemptAt = now;
+
+    logger.warn('Unhandled WebGPU device loss detected; attempting automatic recovery', {
+        reason,
+        attempt: recoveryMeta.attempts,
+    });
+
+    // Prevent concurrent inference work while recovery runs.
+    window.__VLM_INFERENCE_ACTIVE__ = true;
+
+    (async () => {
+        try {
+            const { default: vlmService } = await import('./services/vision-language-service.js');
+            await vlmService.recoverFromDeviceLoss((msg, pct) => {
+                logger.info('GPU recovery progress', { msg, pct });
+            });
+            logger.info('WebGPU auto-recovery completed successfully');
+
+            // If recovery happened during loading, resume state machine progression explicitly.
+            const tryResumeLoadingFlow = () => {
+                const current = stateMachine.getState();
+                if (current.viewState !== VIEW_STATES.LOADING) {
+                    return;
+                }
+
+                if (current.loadingPhase === LOADING_PHASES.LOADING_WGPU) {
+                    stateMachine.dispatch('WGPU_READY');
+                }
+
+                const afterWgpu = stateMachine.getState();
+                if (afterWgpu.viewState === VIEW_STATES.LOADING) {
+                    stateMachine.dispatch('MODEL_LOADED');
+                }
+
+                const movedToRuntime = stateMachine.dispatch('WARMUP_COMPLETE');
+                if (!movedToRuntime) {
+                    // Guard can fail while video is not yet ready; retry shortly.
+                    setTimeout(tryResumeLoadingFlow, 250);
+                }
+            };
+
+            tryResumeLoadingFlow();
+
+            // Recovery succeeded; reset retry budget.
+            recoveryMeta.attempts = 0;
+        } catch (recoveryError) {
+            logger.error('WebGPU auto-recovery failed', {
+                error: String(recoveryError?.message || recoveryError || 'Unknown recovery error'),
+            });
+            if (recoveryMeta.attempts >= 2) {
+                stateMachine.dispatch('FATAL_ERROR', {
+                    code: 'WEBGPU_DEVICE_LOST',
+                    message: 'GPU device was lost and automatic recovery failed. Reload runtime.',
+                    technical: String(
+                        recoveryError?.stack || recoveryError || 'No recovery stack trace available'
+                    ),
+                    recoverAction: {
+                        label: 'Reload Runtime',
+                        handler: () => window.location.reload(),
+                    },
+                });
+            } else {
+                logger.warn('GPU recovery failed; waiting for next device-ready cycle to retry once');
+            }
+        } finally {
+            window.__VLM_GPU_RECOVERY_IN_PROGRESS__ = false;
+            window.__VLM_INFERENCE_ACTIVE__ = false;
+        }
+    })();
+});
 
 console.log('%c🔍 Diagnostics Panel', 'color: #00a8ff; font-weight: bold');
 console.log('%cPress Ctrl+Shift+D to open diagnostics', 'color: #888');

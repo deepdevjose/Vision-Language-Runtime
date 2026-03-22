@@ -38,6 +38,14 @@ class VLMService {
     }
 
     /**
+     * Attempt to recover full inference pipeline after GPU device loss.
+     * @param {Function} [onProgress]
+     */
+    async recoverFromDeviceLoss(onProgress) {
+        return this.coreInference.recoverFromDeviceLoss(onProgress);
+    }
+
+    /**
      * Get inference lock status (for external visibility)
      */
     get inferenceLock() {
@@ -57,6 +65,10 @@ class VLMService {
         const startTime = performance.now();
 
         try {
+            // Signal global inference activity so non-critical visual effects can back off.
+            if (typeof window !== 'undefined') {
+                window.__VLM_INFERENCE_ACTIVE__ = true;
+            }
             performance.mark('vlm:inference-start');
 
             // Initialize QR service on first run
@@ -121,6 +133,9 @@ class VLMService {
             console.error('❌ Inference error:', error);
             throw error;
         } finally {
+            if (typeof window !== 'undefined') {
+                window.__VLM_INFERENCE_ACTIVE__ = false;
+            }
             this.coreInference.releaseInferenceLock();
         }
     }

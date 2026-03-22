@@ -74,13 +74,24 @@ export function createCaptioningView(videoElement) {
     });
     snapshotBtn.innerHTML =
         '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M9 2L7.17 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2h-3.17L15 2H9zm3 15a5 5 0 110-10 5 5 0 010 10z"/></svg><span>Snapshot</span>';
-    snapshotBtn.addEventListener('click', function () {
+    snapshotBtn.addEventListener('click', async function () {
         if (!videoElement) return;
         try {
+            // Avoid competing with active inference work on the main thread.
+            const waitStart = performance.now();
+            while (vlmService?.inferenceLock && performance.now() - waitStart < 1200) {
+                await new Promise((resolve) => setTimeout(resolve, 60));
+            }
+
+            // Let pending paints run before snapshot extraction.
+            await new Promise((resolve) => requestAnimationFrame(resolve));
+
             const c = document.createElement('canvas');
             c.width = videoElement.videoWidth || 640;
             c.height = videoElement.videoHeight || 480;
-            c.getContext('2d').drawImage(videoElement, 0, 0);
+            const snapshotCtx = c.getContext('2d');
+            if (!snapshotCtx) return;
+            snapshotCtx.drawImage(videoElement, 0, 0);
             c.toBlob(function (blob) {
                 if (!blob) return;
                 const url = URL.createObjectURL(blob);
@@ -382,6 +393,8 @@ export function createCaptioningView(videoElement) {
 
         const loop = async () => {
             while (!signal.aborted && isRunning) {
+                // Yield one frame so pending paints/input are handled before inference work.
+                await new Promise((resolve) => requestAnimationFrame(resolve));
                 if (videoElement && videoElement.readyState >= 2 && videoElement.videoWidth > 0) {
                     if (videoElement.paused) await videoElement.play().catch(() => {});
                     if (vlmService.inferenceLock) {

@@ -22,13 +22,95 @@ export class CoreInference {
         this.inferenceLock = false;
         this.warmedUp = false;
         this.performanceTier = 'high'; // Default assumption until detected
+        this.recoveryPromise = null;
+    }
+
+    /**
+     * Determine whether an error indicates WebGPU device loss.
+     * @param {unknown} error
+     * @returns {boolean}
+     */
+    isDeviceLostError(error) {
+        const text = String(error?.message || error || '').toLowerCase();
+        return (
+            text.includes('device is lost') ||
+            text.includes('gpu device lost') ||
+            text.includes('mapasync') ||
+            text.includes('aborterror')
+        );
+    }
+
+    /**
+     * Wrap low-level errors into a stable runtime error.
+     * @param {unknown} error
+     * @returns {Error & {code?: string}}
+     */
+    normalizeInferenceError(error) {
+        if (this.isDeviceLostError(error)) {
+            const wrapped = /** @type {Error & {code?: string}} */ (
+                new Error('WebGPU device was lost during inference')
+            );
+            wrapped.code = 'WEBGPU_DEVICE_LOST';
+            return wrapped;
+        }
+
+        const passthrough = /** @type {Error & {code?: string}} */ (
+            error instanceof Error ? error : new Error(String(error || 'Unknown inference error'))
+        );
+        return passthrough;
+    }
+
+    /**
+     * Reset runtime fields so model can be cleanly reloaded after device loss.
+     */
+    resetForRecovery() {
+        this.processor = null;
+        this.model = null;
+        this.isLoaded = false;
+        this.isLoading = false;
+        this.loadPromise = null;
+        this.inferenceLock = false;
+        this.warmedUp = false;
+    }
+
+    /**
+     * Attempt one full model pipeline recovery after GPU device loss.
+     * @param {Function} [onProgress]
+     */
+    async recoverFromDeviceLoss(onProgress) {
+        if (this.recoveryPromise) {
+            return this.recoveryPromise;
+        }
+
+        this.recoveryPromise = (async () => {
+            // First recovery pass: clean reset + lighter startup path.
+            this.resetForRecovery();
+            webgpuDetector.reset();
+            this.performanceTier = 'low';
+
+            try {
+                await this.loadModel(onProgress, { skipWarmup: true });
+            } catch (firstError) {
+                // Second and last pass with a fully fresh detector/device attempt.
+                this.resetForRecovery();
+                webgpuDetector.reset();
+                await new Promise((resolve) => setTimeout(resolve, 350));
+                await this.loadModel(onProgress, { skipWarmup: true });
+            }
+        })();
+
+        try {
+            await this.recoveryPromise;
+        } finally {
+            this.recoveryPromise = null;
+        }
     }
 
     /**
      * Load model and processor from Hugging Face
      * @param {Function} onProgress - Callback for progress updates
      */
-    async loadModel(onProgress) {
+    async loadModel(onProgress, options = {}) {
         if (this.isLoaded) {
             onProgress?.('Model already loaded!');
             return;
@@ -101,9 +183,14 @@ export class CoreInference {
                 this.isLoaded = true;
                 performance.mark('vlm:model-weights-loaded');
 
-                onProgress?.('Warming up inference pipeline...', 85);
-                await this.performWarmup();
-                onProgress?.('Warmup complete!', 95);
+                if (options.skipWarmup) {
+                    onProgress?.('Skipping warmup for fast recovery...', 92);
+                    this.warmedUp = false;
+                } else {
+                    onProgress?.('Warming up inference pipeline...', 85);
+                    await this.performWarmup();
+                    onProgress?.('Warmup complete!', 95);
+                }
                 performance.mark('vlm:model-load-end');
 
                 try {
@@ -197,70 +284,101 @@ export class CoreInference {
             throw new Error('Model/processor not loaded');
         }
 
-        const { RawImage } = await import('@huggingface/transformers');
-        const frame = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+        try {
+            const t0 = performance.now();
+            const { RawImage } = await import('@huggingface/transformers');
 
-        const rawImage = new RawImage(frame.data, frame.width, frame.height, 4);
+            const getImageDataStart = performance.now();
+            const frame = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+            const getImageDataMs = performance.now() - getImageDataStart;
 
-        const inputs = await this.processor(rawImage, prompt, {
-            add_special_tokens: false,
-        });
+            const rawImage = new RawImage(frame.data, frame.width, frame.height, 4);
 
-        if (MODEL_CONFIG.DEBUG) console.log('🤖 Running model inference...');
+            const preprocessStart = performance.now();
+            const inputs = await this.processor(rawImage, prompt, {
+                add_special_tokens: false,
+            });
+            const preprocessMs = performance.now() - preprocessStart;
 
-        const currentProfile = QOS_PROFILES[this.performanceTier] || QOS_PROFILES.high;
-        const maxTokens = currentProfile.MAX_NEW_TOKENS;
+            if (MODEL_CONFIG.DEBUG) console.log('🤖 Running model inference...');
 
-        let streamed = '';
-        let tokenCount = 0;
+            const currentProfile = QOS_PROFILES[this.performanceTier] || QOS_PROFILES.high;
+            const maxTokens = currentProfile.MAX_NEW_TOKENS;
 
-        const streamer = new TextStreamer(this.processor.tokenizer, {
-            skip_prompt: true,
-            skip_special_tokens: true,
-            callback_function: (token) => {
-                streamed += token;
-                tokenCount++;
-                if (MODEL_CONFIG.DEBUG && tokenCount % 5 === 0) {
-                    console.log(`📤 Streaming... (${tokenCount} tokens)`);
-                }
+            let streamed = '';
+            let tokenCount = 0;
+            const STREAM_UPDATE_EVERY_N_TOKENS = 5;
+
+            const streamer = new TextStreamer(this.processor.tokenizer, {
+                skip_prompt: true,
+                skip_special_tokens: true,
+                callback_function: (token) => {
+                    streamed += token;
+                    tokenCount++;
+                    if (MODEL_CONFIG.DEBUG && tokenCount % 5 === 0) {
+                        console.log(`📤 Streaming... (${tokenCount} tokens)`);
+                    }
+                    // Avoid reflow on every token; batch UI updates.
+                    if (tokenCount % STREAM_UPDATE_EVERY_N_TOKENS === 0) {
+                        onTextUpdate?.(streamed.trim());
+                    }
+                },
+            });
+
+            performance.mark('vlm:model-execution-start');
+
+            const outputs = await this.model.generate({
+                ...inputs,
+                max_new_tokens: maxTokens,
+                do_sample: false,
+                streamer,
+                repetition_penalty: 1.2,
+            });
+
+            performance.mark('vlm:model-execution-end');
+
+            if (MODEL_CONFIG.DEBUG && !isWarmup) {
+                console.log(`✅ Model output generated (${maxTokens} max tokens)`);
+                try {
+                    performance.measure(
+                        'Model Execution',
+                        'vlm:model-execution-start',
+                        'vlm:model-execution-end'
+                    );
+                } catch (e) {}
+            }
+
+            const finalText =
+                streamed.trim() ||
+                this.processor
+                    .batch_decode(outputs.slice(null, [inputs.input_ids.dims.at(-1), null]), {
+                        skip_special_tokens: true,
+                    })[0]
+                    .trim();
+
+            // Ensure the UI receives the final buffered text.
+            if (streamed.trim()) {
                 onTextUpdate?.(streamed.trim());
-            },
-        });
+            }
 
-        performance.mark('vlm:model-execution-start');
+            if (MODEL_CONFIG.DEBUG && !isWarmup) console.log('💬 Final caption:', finalText);
 
-        const outputs = await this.model.generate({
-            ...inputs,
-            max_new_tokens: maxTokens,
-            do_sample: false,
-            streamer,
-            repetition_penalty: 1.2,
-        });
-
-        performance.mark('vlm:model-execution-end');
-
-        if (MODEL_CONFIG.DEBUG && !isWarmup) {
-            console.log(`✅ Model output generated (${maxTokens} max tokens)`);
-            try {
-                performance.measure(
-                    'Model Execution',
-                    'vlm:model-execution-start',
-                    'vlm:model-execution-end'
+            if (MODEL_CONFIG.DEBUG && !isWarmup) {
+                const totalMs = performance.now() - t0;
+                const postGenerateMs = totalMs - getImageDataMs - preprocessMs;
+                console.log(
+                    `⏱️ Inference stages | getImageData=${getImageDataMs.toFixed(1)}ms | preprocess=${preprocessMs.toFixed(1)}ms | generate+decode=${postGenerateMs.toFixed(1)}ms | total=${totalMs.toFixed(1)}ms`
                 );
-            } catch (e) {}
+            }
+
+            return finalText;
+        } catch (error) {
+            const normalizedError = this.normalizeInferenceError(error);
+            if (normalizedError.code === 'WEBGPU_DEVICE_LOST') {
+                console.error('🔌 WebGPU device lost during inference');
+            }
+            throw normalizedError;
         }
-
-        const finalText =
-            streamed.trim() ||
-            this.processor
-                .batch_decode(outputs.slice(null, [inputs.input_ids.dims.at(-1), null]), {
-                    skip_special_tokens: true,
-                })[0]
-                .trim();
-
-        if (MODEL_CONFIG.DEBUG && !isWarmup) console.log('💬 Final caption:', finalText);
-
-        return finalText;
     }
 
     /**

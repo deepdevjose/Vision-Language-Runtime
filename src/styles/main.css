@@ -779,12 +779,6 @@ a:hover {
 
 /* Tablet and smaller (landscape tablets, large phones) */
 @media (max-width: 1024px) {
-    .ascii-background {
-        font-size: 8px;
-        line-height: 8px;
-        padding: 16px;
-    }
-
     .welcome-hero-card {
         padding: 4rem 2.5rem;
     }
@@ -819,13 +813,6 @@ a:hover {
         min-height: 48px;
     }
 
-    /* Reduce ASCII blur for performance on mobile */
-    .ascii-background {
-        filter: blur(8px);
-        font-size: 7px;
-        line-height: 7px;
-        padding: 12px;
-    }
 }
 
 /* Mobile devices */
@@ -857,17 +844,6 @@ a:hover {
         font-size: 0.6875rem;
     }
 
-    /* Further optimize ASCII for small screens */
-    .ascii-background {
-        filter: blur(6px);
-        opacity: 0.7;
-        font-size: 6px;
-        line-height: 6px;
-    }
-
-    .ascii-background.active {
-        opacity: 0.7;
-    }
 }
 
 /* Small mobile devices (iPhone SE, etc) */
@@ -929,43 +905,4 @@ a:hover {
 
 .hover-scale-105:hover {
     transform: scale(1.05);
-}
-
-/* ===========================
-   ASCII Background (Ultra-Subtle)
-   =========================== */
-
-.ascii-background {
-    position: fixed;
-    inset: 0;
-    margin: 0;
-    padding: 24px;
-    font-family: ui-monospace, 'SF Mono', 'Menlo', 'Monaco', 'Consolas', monospace;
-    font-size: 9px;
-    line-height: 9px;
-    letter-spacing: 0;
-    color: rgba(255, 255, 255, 0.06);
-    filter: blur(12px);
-    /* Match video orientation (no mirror effect) */
-    transform: scaleX(-1);
-    user-select: none;
-    pointer-events: none;
-    white-space: pre;
-    overflow: hidden;
-    z-index: 0;
-    opacity: 0;
-    transition: opacity 1.5s ease-in-out;
-}
-
-.ascii-background.active {
-    opacity: 1;
-}
-
-/* Optional: dark overlay to soften ASCII further */
-.ascii-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.3);
-    pointer-events: none;
-    z-index: 0;
 }

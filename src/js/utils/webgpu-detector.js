@@ -217,6 +217,8 @@ class WebGPUDetector {
             // Handle device lost events
             this.device.lost.then((info) => {
                 console.error('🔌 WebGPU device lost:', info.message);
+                // Keep detector reusable after loss.
+                this.device = null;
             });
 
             return this.device;
@@ -224,6 +226,19 @@ class WebGPUDetector {
             console.error('❌ Failed to create WebGPU device:', error);
             throw error;
         }
+    }
+
+    /**
+     * Reset cached adapter/device and detection state.
+     * Useful after GPU device loss to force a clean re-detect.
+     */
+    reset() {
+        this.adapter = null;
+        this.device = null;
+        this.features = new Set();
+        this.limits = {};
+        this._cachedResult = null;
+        this._detectPromise = null;
     }
 
     /**

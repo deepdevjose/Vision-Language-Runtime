@@ -17,6 +17,7 @@ const ERROR_ICONS = {
     STREAM_LOST: '⚠️',
     MODEL_LOAD_FAILED: '❌',
     WEBGPU_NOT_SUPPORTED: '⚡',
+    WEBGPU_DEVICE_LOST: '🔌',
     UNKNOWN_ERROR: '⚠️',
 };
 
@@ -155,6 +156,7 @@ function getErrorTitle(code) {
         STREAM_LOST: 'Camera Connection Lost',
         MODEL_LOAD_FAILED: 'Model Load Failed',
         WEBGPU_NOT_SUPPORTED: 'WebGPU Not Supported',
+        WEBGPU_DEVICE_LOST: 'GPU Device Lost',
         UNKNOWN_ERROR: 'Something Went Wrong',
     };
 
