@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Minimal WebGPU Inference Test</title>
+    <script type="importmap">
+    {
+        "imports": {
+            "@huggingface/transformers": "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.2/dist/transformers.min.js"
+        }
+    }
+    </script>
+</head>
+<body>
+    <h2>Minimal FastVLM WebGPU Test</h2>
+    <p>Open the browser console (F12) to see output.</p>
+    <button id="btn" onclick="runTest()">Start Test</button>
+    <pre id="log" style="background:#111;color:#0f0;padding:16px;max-height:80vh;overflow:auto;"></pre>
+
+    <script type="module">
+        import {
+            AutoProcessor,
+            AutoModelForImageTextToText,
+            RawImage,
+            TextStreamer,
+        } from '@huggingface/transformers';
+
+        function log(msg) {
+            const el = document.getElementById('log');
+            const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            el.textContent += line + '\n';
+            el.scrollTop = el.scrollHeight;
+            console.log(line);
+        }
+
+        window.runTest = async function() {
+            const btn = document.getElementById('btn');
+            btn.disabled = true;
+
+            const MODEL_ID = 'onnx-community/FastVLM-0.5B-ONNX';
+
+            try {
+                // Step 1: Check WebGPU
+                log('1. Checking WebGPU...');
+                if (!navigator.gpu) {
+                    log('❌ WebGPU not available!');
+                    return;
+                }
+                const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
+                log(`   Adapter: ${adapter?.info?.description || 'unknown'}`);
+                log(`   FP16: ${adapter?.features?.has('shader-f16') ? 'YES' : 'NO'}`);
+
+                // Step 2: Load processor (exactly like Apple)
+                log('2. Loading processor...');
+                const processor = await AutoProcessor.from_pretrained(MODEL_ID);
+                log('   ✅ Processor loaded');
+
+                // Step 3: Load model (exactly like Apple)
+                log('3. Loading model (this downloads ~250MB on first run)...');
+                const model = await AutoModelForImageTextToText.from_pretrained(MODEL_ID, {
+                    dtype: {
+                        embed_tokens: 'fp16',
+                        vision_encoder: 'q4',
+                        decoder_model_merged: 'q4',
+                    },
+                    device: 'webgpu',
+                });
+                log('   ✅ Model loaded');
+
+                // Step 4: Create a test image (solid gray 320x240 — no webcam needed)
+                log('4. Creating test image...');
+                const canvas = document.createElement('canvas');
+                canvas.width = 320;
+                canvas.height = 240;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                ctx.fillStyle = '#808080';
+                ctx.fillRect(0, 0, 320, 240);
+                // Draw a red rectangle so vision model has something to describe
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(100, 70, 120, 100);
+                const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const rawImage = new RawImage(frame.data, frame.width, frame.height, 4);
+                log('   ✅ Test image created (320x240 with red rectangle)');
+
+                // Step 5: Prepare prompt (exactly like Apple)
+                log('5. Preparing prompt...');
+                const messages = [
+                    { role: 'system', content: 'You are a helpful visual AI assistant. Respond concisely and accurately to the user\'s query in one sentence.' },
+                    { role: 'user', content: '<image>Describe what you see.' },
+                ];
+                const prompt = processor.apply_chat_template(messages, {
+                    add_generation_prompt: true,
+                });
+                log(`   Prompt: ${prompt.substring(0, 80)}...`);
+
+                // Step 6: Preprocess
+                log('6. Preprocessing...');
+                const inputs = await processor(rawImage, prompt, {
+                    add_special_tokens: false,
+                });
+                log(`   ✅ input_ids shape: [${inputs.input_ids.dims}]`);
+                log(`   ✅ pixel_values shape: [${inputs.pixel_values.dims}]`);
+
+                // Step 7: Generate! (exactly like Apple — no timeout!)
+                log('7. Running model.generate()...');
+                log('   ⏳ This may take 1-3 minutes on first run (shader compilation)...');
+                const t0 = performance.now();
+
+                let tokenCount = 0;
+                const streamer = new TextStreamer(processor.tokenizer, {
+                    skip_prompt: true,
+                    skip_special_tokens: true,
+                    callback_function: (token) => {
+                        tokenCount++;
+                        if (tokenCount === 1) {
+                            log(`   🟢 FIRST TOKEN at ${((performance.now() - t0) / 1000).toFixed(1)}s: "${token}"`);
+                        }
+                    },
+                });
+
+                const outputs = await model.generate({
+                    ...inputs,
+                    max_new_tokens: 50,
+                    do_sample: false,
+                    streamer,
+                    repetition_penalty: 1.2,
+                });
+
+                const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
+                log(`   ✅ Generation complete in ${elapsed}s (${tokenCount} tokens)`);
+
+                // Step 8: Decode
+                const decoded = processor.batch_decode(
+                    outputs.slice(null, [inputs.input_ids.dims.at(-1), null]),
+                    { skip_special_tokens: true }
+                );
+                log(`8. Result: "${decoded[0].trim()}"`);
+                log('🎉 SUCCESS! Model inference works on this GPU.');
+
+            } catch (error) {
+                log(`❌ ERROR: ${error.message}`);
+                log(`   Stack: ${error.stack}`);
+            }
+
+            btn.disabled = false;
+        };
+    </script>
+</body>
+</html>

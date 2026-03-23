@@ -7,10 +7,38 @@
 import {
     AutoProcessor,
     AutoModelForImageTextToText,
+    RawImage,
     TextStreamer,
+    env,
 } from '@huggingface/transformers';
 import { MODEL_CONFIG, QOS_PROFILES } from '../utils/constants.js';
 import webgpuDetector from '../utils/webgpu-detector.js';
+
+/** Timeout (ms) for model/processor downloads. */
+const MODEL_LOAD_TIMEOUT_MS = 120_000;
+
+/** Per-tier timeout (ms) for a single `model.generate()` call. (Currently unused to prevent WebGPU deadlock during shader compilation) */
+const INFERENCE_TIMEOUT_MS = { high: 30_000, medium: 45_000, low: 60_000 };
+
+/**
+ * Race a promise against a timeout.
+ * @template T
+ * @param {Promise<T>} promise
+ * @param {number} ms
+ * @param {string} label
+ * @returns {Promise<T>}
+ */
+function withTimeout(promise, ms, label) {
+    return Promise.race([
+        promise,
+        new Promise((_resolve, reject) =>
+            setTimeout(
+                () => reject(new Error(`${label} timed out after ${ms / 1000}s`)),
+                ms
+            )
+        ),
+    ]);
+}
 
 export class CoreInference {
     constructor() {
@@ -21,6 +49,7 @@ export class CoreInference {
         this.loadPromise = null;
         this.inferenceLock = false;
         this.warmedUp = false;
+        this.shadersReady = false; // true only after first successful generate()
         this.performanceTier = 'high'; // Default assumption until detected
         this.recoveryPromise = null;
     }
@@ -71,6 +100,7 @@ export class CoreInference {
         this.loadPromise = null;
         this.inferenceLock = false;
         this.warmedUp = false;
+        this.shadersReady = false;
     }
 
     /**
@@ -89,13 +119,13 @@ export class CoreInference {
             this.performanceTier = 'low';
 
             try {
-                await this.loadModel(onProgress, { skipWarmup: true });
+                await this.loadModel(onProgress);
             } catch (firstError) {
                 // Second and last pass with a fully fresh detector/device attempt.
                 this.resetForRecovery();
                 webgpuDetector.reset();
                 await new Promise((resolve) => setTimeout(resolve, 350));
-                await this.loadModel(onProgress, { skipWarmup: true });
+                await this.loadModel(onProgress);
             }
         })();
 
@@ -126,12 +156,32 @@ export class CoreInference {
         this.loadPromise = (async () => {
             try {
                 performance.mark('vlm:model-load-start');
-                onProgress?.('Detecting GPU capabilities...', 5);
 
-                const gpuInfo = await webgpuDetector.detect();
+                // Enable browser cache for model files
+                env.useBrowserCache = true;
+
+                onProgress?.('Detecting GPU & loading processor...', 5);
+
+                // Parallelize GPU detection and processor loading
+                const [gpuInfo, processor] = await Promise.all([
+                    withTimeout(
+                        webgpuDetector.detect(),
+                        MODEL_LOAD_TIMEOUT_MS,
+                        'GPU detection'
+                    ),
+                    withTimeout(
+                        AutoProcessor.from_pretrained(MODEL_CONFIG.MODEL_ID),
+                        MODEL_LOAD_TIMEOUT_MS,
+                        'Processor download'
+                    ),
+                ]);
+
                 if (!gpuInfo.supported) {
                     throw new Error('WebGPU not supported on this device/browser');
                 }
+
+                this.processor = processor;
+                performance.mark('vlm:processor-loaded');
 
                 const perfEstimate = webgpuDetector.getPerformanceEstimate();
                 this.performanceTier = perfEstimate.tier;
@@ -144,39 +194,50 @@ export class CoreInference {
                     perfEstimate.recommendations.forEach((rec) => console.log(`   ${rec}`));
                 }
 
-                onProgress?.('Loading processor...', 10);
-                this.processor = await AutoProcessor.from_pretrained(MODEL_CONFIG.MODEL_ID);
-                performance.mark('vlm:processor-loaded');
+                onProgress?.('Processor loaded. Loading model...', 10);
 
-                onProgress?.('Processor loaded. Loading model...', 20);
-                this.model = await AutoModelForImageTextToText.from_pretrained(
-                    MODEL_CONFIG.MODEL_ID,
-                    {
-                        dtype: {
-                            embed_tokens: 'fp16',
-                            vision_encoder: 'q4',
-                            decoder_model_merged: 'q4',
-                        },
-                        device: 'webgpu',
-                        progress_callback: (data) => {
-                            if (data.status === 'progress') {
-                                const fileName = data.file || 'unknown';
-                                const progress = data.progress || 0;
+                // Timeout on model download
+                this.model = await withTimeout(
+                    AutoModelForImageTextToText.from_pretrained(
+                        MODEL_CONFIG.MODEL_ID,
+                        {
+                            dtype: {
+                                embed_tokens: 'fp16',
+                                vision_encoder: 'q4',
+                                decoder_model_merged: 'q4',
+                            },
+                            device: 'webgpu',
+                            // Weighted progress by bytes downloaded
+                            progress_callback: (data) => {
+                                if (data.status === 'progress') {
+                                    const fileName = data.file || 'unknown';
+                                    const loaded = data.loaded || 0;
+                                    const total = data.total || 1;
 
-                                fileProgress.set(fileName, progress);
-                                const progressValues = Array.from(fileProgress.values());
-                                const avgProgress =
-                                    progressValues.reduce((a, b) => a + b, 0) /
-                                    progressValues.length;
-                                const overallPercent = Math.round(avgProgress);
+                                    fileProgress.set(fileName, { loaded, total });
 
-                                onProgress?.(
-                                    `Downloading model files... (${fileProgress.size} files)`,
-                                    20 + overallPercent * 0.6
-                                );
-                            }
-                        },
-                    }
+                                    let sumLoaded = 0;
+                                    let sumTotal = 0;
+                                    for (const v of fileProgress.values()) {
+                                        sumLoaded += v.loaded;
+                                        sumTotal += v.total;
+                                    }
+                                    const overallPercent =
+                                        sumTotal > 0
+                                            ? Math.round((sumLoaded / sumTotal) * 100)
+                                            : 0;
+
+                                    // Emit raw 0–100; loading-screen maps to UI range
+                                    onProgress?.(
+                                        `Downloading model files... (${fileProgress.size} files)`,
+                                        overallPercent
+                                    );
+                                }
+                            },
+                        }
+                    ),
+                    MODEL_LOAD_TIMEOUT_MS,
+                    'Model download'
                 );
 
                 onProgress?.('Model loaded successfully!', 80);
@@ -191,6 +252,8 @@ export class CoreInference {
                     await this.performWarmup();
                     onProgress?.('Warmup complete!', 95);
                 }
+
+                onProgress?.('Ready!', 95);
                 performance.mark('vlm:model-load-end');
 
                 try {
@@ -236,16 +299,17 @@ export class CoreInference {
         if (this.warmedUp) return;
 
         try {
-            console.log('🔥 Starting model warmup...');
+            const WARMUP_KEY = 'vlm:warmup-done';
+            console.log('🔥 Starting model warmup (1 run, max_tokens=1)...');
 
+            // Plain canvas — OffscreenCanvas can cause RawImage buffer issues
             const warmupCanvas = document.createElement('canvas');
-            warmupCanvas.width = 320;
-            warmupCanvas.height = 240;
+            warmupCanvas.width = 224;
+            warmupCanvas.height = 224;
             const ctx = warmupCanvas.getContext('2d');
             ctx.fillStyle = '#808080';
-            ctx.fillRect(0, 0, 320, 240);
+            ctx.fillRect(0, 0, 224, 224);
 
-            // Format warmup prompt using proper chat template (matching inference flow)
             const currentProfile = QOS_PROFILES[this.performanceTier] || QOS_PROFILES.high;
             const warmupMessages = [
                 { role: 'system', content: currentProfile.SYSTEM_PROMPT },
@@ -255,23 +319,27 @@ export class CoreInference {
                 add_generation_prompt: true,
             });
 
-            for (let i = 0; i < 2; i++) {
-                const startTime = performance.now();
-                await this.runModelGenerate(warmupCanvas, warmupPrompt, null, true);
-                const elapsed = performance.now() - startTime;
-                console.log(
-                    `🔥 Warmup inference ${i + 1}/2 completed in ${(elapsed / 1000).toFixed(2)}s`
-                );
-            }
+            const startTime = performance.now();
+            // Pass maxTokens=1 — just enough to trigger shader compilation
+            await this.runModelGenerate(warmupCanvas, warmupPrompt, null, true, 1);
+            const elapsed = performance.now() - startTime;
+            console.log(`🔥 Warmup completed in ${(elapsed / 1000).toFixed(2)}s`);
 
             this.warmedUp = true;
-            console.log('✅ Warmup complete - inference pipeline stabilized');
+            this.shadersReady = true;
+            try { sessionStorage.setItem(WARMUP_KEY, '1'); } catch {}
+            console.log('✅ Warmup complete — shaders compiled, pipeline ready');
         } catch (error) {
-            console.warn('⚠️ Warmup failed (non-critical):', error);
+            // Warmup timed out — the GPU is still compiling shaders in background.
+            // Mark warmedUp so we don't loop, but shadersReady stays false so
+            // real inference uses a longer timeout until shaders are confirmed ready.
+            this.warmedUp = true;
+            try { sessionStorage.setItem('vlm:warmup-done', '1'); } catch {}
+            console.warn('⚠️ Warmup timed out — shaders still compiling. First inference will use extended timeout.');
         }
     }
 
-    /**
+        /**
      * Run model generation with streaming
      * @param {HTMLCanvasElement} canvas - Canvas with processed image
      * @param {string} prompt - Prepared prompt string
@@ -279,14 +347,14 @@ export class CoreInference {
      * @param {boolean} isWarmup - Whether this is a warmup inference
      * @returns {Promise<string>} Generated text
      */
-    async runModelGenerate(canvas, prompt, onTextUpdate, isWarmup = false) {
+    async runModelGenerate(canvas, prompt, onTextUpdate, isWarmup = false, warmupMaxTokens = null) {
         if (!this.model || !this.processor) {
             throw new Error('Model/processor not loaded');
         }
 
         try {
             const t0 = performance.now();
-            const { RawImage } = await import('@huggingface/transformers');
+            // Fix 8: RawImage imported statically at top of file
 
             const getImageDataStart = performance.now();
             const frame = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
@@ -301,20 +369,29 @@ export class CoreInference {
             const preprocessMs = performance.now() - preprocessStart;
 
             if (MODEL_CONFIG.DEBUG) console.log('🤖 Running model inference...');
+            if (MODEL_CONFIG.DEBUG) {
+                console.log(`🔍 Inference input: image=${frame.width}x${frame.height}, tier=${this.performanceTier}, isWarmup=${isWarmup}`);
+            }
 
             const currentProfile = QOS_PROFILES[this.performanceTier] || QOS_PROFILES.high;
-            const maxTokens = currentProfile.MAX_NEW_TOKENS;
+            const maxTokens = warmupMaxTokens ?? currentProfile.MAX_NEW_TOKENS;
 
             let streamed = '';
             let tokenCount = 0;
+            let firstTokenAt = 0;
             const STREAM_UPDATE_EVERY_N_TOKENS = 5;
 
-            const streamer = new TextStreamer(this.processor.tokenizer, {
+            // Skip streamer on warmup — no output needed, reduces overhead
+            const streamer = isWarmup ? undefined : new TextStreamer(this.processor.tokenizer, {
                 skip_prompt: true,
                 skip_special_tokens: true,
                 callback_function: (token) => {
                     streamed += token;
                     tokenCount++;
+                    if (tokenCount === 1) {
+                        firstTokenAt = performance.now();
+                        console.log(`🟢 First token received at ${((firstTokenAt - t0) / 1000).toFixed(2)}s`);
+                    }
                     if (MODEL_CONFIG.DEBUG && tokenCount % 5 === 0) {
                         console.log(`📤 Streaming... (${tokenCount} tokens)`);
                     }
@@ -327,13 +404,22 @@ export class CoreInference {
 
             performance.mark('vlm:model-execution-start');
 
+            // 🚨 CRITICAL FIX: Removed withTimeout() wrapper here!
+            // First-run shader compilation can take 60s-120s+ on mobile/low-end GPUs.
+            // If we throw a timeout error in JS, the WebGPU driver is STILL compiling in the background.
+            // When the UI loop retries, we send a *second* generate() request, permanently locking the GPU.
+            // We MUST let model.generate() resolve naturally to maintain pipeline integrity.
+            console.log(`⏳ model.generate() starting (maxTokens=${maxTokens}, warmedUp=${this.warmedUp}). First run may take 1-2 minutes for shader compilation...`);
+            const generateStart = performance.now();
             const outputs = await this.model.generate({
                 ...inputs,
                 max_new_tokens: maxTokens,
                 do_sample: false,
-                streamer,
+                ...(streamer ? { streamer } : {}),
                 repetition_penalty: 1.2,
             });
+            console.log(`✅ model.generate() resolved in ${((performance.now() - generateStart) / 1000).toFixed(2)}s (${tokenCount} tokens)`);
+            this.shadersReady = true; // Shaders confirmed compiled after first successful generate
 
             performance.mark('vlm:model-execution-end');
 

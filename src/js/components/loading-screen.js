@@ -160,9 +160,10 @@ export function createLoadingScreen(onPhaseChange, onComplete, onError) {
                 else if (message.includes('Model loaded'))
                     thinking = 'Optimizing execution graph...';
 
+                // Fix 6: core-inference emits raw 0–100; map to weights-step UI range (15–75%)
                 const pct =
                     progressPercent !== undefined
-                        ? Math.max(progress, progressPercent * 0.7)
+                        ? Math.max(progress, 15 + progressPercent * 0.6)
                         : progress;
                 setProgress(pct, thinking);
             });

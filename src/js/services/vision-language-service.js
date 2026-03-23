@@ -6,12 +6,14 @@
  * - processing: Image processing and pre/post-processing
  * - telemetry: Performance monitoring and QoS
  * - plugins/qr-service: QR code detection
+ * - inference-worker-bridge: Off-main-thread inference (Fix 7)
  */
 
 import coreInference from './core-inference.js';
 import imageProcessor from './processing.js';
 import telemetryService from './telemetry.js';
 import qrService from './plugins/qr-service.js';
+import workerBridge from './inference-worker-bridge.js';
 
 class VLMService {
     constructor() {
@@ -19,6 +21,13 @@ class VLMService {
         this.imageProcessor = imageProcessor;
         this.telemetry = telemetryService;
         this.qrService = qrService;
+        /**
+         * Off-main-thread inference bridge (Fix 7).
+         * Use this for fully non-blocking inference when WebGPU
+         * device ownership from a Worker is supported by the browser.
+         * @type {import('./inference-worker-bridge.js').InferenceWorkerBridge}
+         */
+        this.workerBridge = workerBridge;
     }
 
     /**
