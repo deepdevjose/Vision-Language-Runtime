@@ -16,6 +16,8 @@ import webgpuDetector from '../utils/webgpu-detector.js';
 
 /** Timeout (ms) for model/processor downloads. */
 const MODEL_LOAD_TIMEOUT_MS = 120_000;
+const WEB_COMPAT_MODEL_FALLBACK = 'onnx-community/FastVLM-0.5B-ONNX';
+const PYTORCH_ONLY_MODEL_ID = 'apple/FastVLM-0.5B';
 
 /** Per-tier timeout (ms) for a single `model.generate()` call. (Currently unused to prevent WebGPU deadlock during shader compilation) */
 const INFERENCE_TIMEOUT_MS = { high: 30_000, medium: 45_000, low: 60_000 };
@@ -152,6 +154,10 @@ export class CoreInference {
 
         this.isLoading = true;
         const fileProgress = new Map();
+        const modelId =
+            MODEL_CONFIG.MODEL_ID === PYTORCH_ONLY_MODEL_ID
+                ? WEB_COMPAT_MODEL_FALLBACK
+                : MODEL_CONFIG.MODEL_ID;
 
         this.loadPromise = (async () => {
             try {
@@ -162,6 +168,12 @@ export class CoreInference {
 
                 onProgress?.('Detecting GPU & loading processor...', 5);
 
+                if (modelId !== MODEL_CONFIG.MODEL_ID) {
+                    console.warn(
+                        `⚠️ ${MODEL_CONFIG.MODEL_ID} is not web-compatible. Falling back to ${modelId}.`
+                    );
+                }
+
                 // Parallelize GPU detection and processor loading
                 const [gpuInfo, processor] = await Promise.all([
                     withTimeout(
@@ -170,7 +182,7 @@ export class CoreInference {
                         'GPU detection'
                     ),
                     withTimeout(
-                        AutoProcessor.from_pretrained(MODEL_CONFIG.MODEL_ID),
+                        AutoProcessor.from_pretrained(modelId),
                         MODEL_LOAD_TIMEOUT_MS,
                         'Processor download'
                     ),
@@ -199,7 +211,7 @@ export class CoreInference {
                 // Timeout on model download
                 this.model = await withTimeout(
                     AutoModelForImageTextToText.from_pretrained(
-                        MODEL_CONFIG.MODEL_ID,
+                        modelId,
                         {
                             dtype: {
                                 embed_tokens: 'fp16',

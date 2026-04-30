@@ -108,6 +108,7 @@ export const LANGUAGE_KEYWORDS = {
 };
 
 export const MODEL_CONFIG = {
+    // Browser runtime must use ONNX artifacts compatible with Transformers.js.
     MODEL_ID: 'onnx-community/FastVLM-0.5B-ONNX',
     // ⚠️  These are CEILING values only - actual limits come from QOS_PROFILES per tier
     MAX_NEW_TOKENS: 128, // Ceiling (used: QOS_PROFILES[tier].MAX_NEW_TOKENS in core-inference.js:211)
