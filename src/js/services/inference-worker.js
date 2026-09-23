@@ -15,7 +15,7 @@
  *     { type: 'getState' }                    — Query loaded state
  *
  *   Worker → Main:
- *     { type: 'progress',    message, percent }
+ *     { type: 'progress',    message, percent, downloadProgress? }
  *     { type: 'loaded' }
  *     { type: 'warmedUp' }
  *     { type: 'token',       text }           — Streaming token update
@@ -37,7 +37,6 @@ import {
 // ── Constants (duplicated from constants.js to keep worker self-contained) ──
 
 const MODEL_ID = 'onnx-community/FastVLM-0.5B-ONNX';
-const MODEL_LOAD_TIMEOUT_MS = 120_000;
 
 const QOS_PROFILES = {
     low: {
@@ -57,18 +56,6 @@ const QOS_PROFILES = {
 };
 
 // ── Helpers ─────────────────────────────────────────────────────
-
-function withTimeout(promise, ms, label) {
-    return Promise.race([
-        promise,
-        new Promise((_resolve, reject) =>
-            setTimeout(
-                () => reject(new Error(`${label} timed out after ${ms / 1000}s`)),
-                ms
-            )
-        ),
-    ]);
-}
 
 function post(msg) {
     self.postMessage(msg);
@@ -94,57 +81,82 @@ async function loadModel(options = {}) {
     if (isLoading) return;
     isLoading = true;
 
-    const fileProgress = new Map();
+    const fileProgress = {
+        processor: new Map(),
+        model: new Map(),
+    };
+
+    const reportDownloadProgress = (data, phase) => {
+        const status = data?.status;
+        if (!['init', 'download', 'progress', 'done'].includes(status)) return;
+
+        const fileName = data.file || data.name || 'unknown';
+        const phaseProgress = fileProgress[phase];
+        const previous = phaseProgress.get(fileName) || { loaded: 0, total: 0 };
+        const loaded = Number(data.loaded);
+        const total = Number(data.total);
+        phaseProgress.set(fileName, {
+            loaded:
+                status === 'done' && Number.isFinite(total) && total > 0
+                    ? total
+                    : Number.isFinite(loaded)
+                      ? loaded
+                      : previous.loaded,
+            total: Number.isFinite(total) && total > 0 ? total : previous.total,
+        });
+
+        let sumLoaded = 0;
+        let sumTotal = 0;
+        for (const file of phaseProgress.values()) {
+            sumLoaded += file.loaded;
+            sumTotal += file.total;
+        }
+
+        const callbackPercent = Number(data.progress);
+        const percent =
+            sumTotal > 0
+                ? Math.round((sumLoaded / sumTotal) * 100)
+                : Number.isFinite(callbackPercent) && callbackPercent >= 0
+                  ? Math.round(callbackPercent)
+                  : undefined;
+
+        post({
+            type: 'progress',
+            message:
+                phase === 'processor'
+                    ? `Downloading processor files... (${phaseProgress.size} files)`
+                    : `Downloading model files... (${phaseProgress.size} files)`,
+            percent,
+            downloadProgress: {
+                phase,
+                percent,
+                loaded: sumLoaded,
+                total: sumTotal,
+                files: phaseProgress.size,
+            },
+        });
+    };
 
     try {
         env.useBrowserCache = true;
 
         post({ type: 'progress', message: 'Loading processor...', percent: 5 });
 
-        processor = await withTimeout(
-            AutoProcessor.from_pretrained(MODEL_ID),
-            MODEL_LOAD_TIMEOUT_MS,
-            'Processor download'
-        );
+        processor = await AutoProcessor.from_pretrained(MODEL_ID, {
+            progress_callback: (data) => reportDownloadProgress(data, 'processor'),
+        });
 
         post({ type: 'progress', message: 'Processor loaded. Loading model...', percent: 10 });
 
-        model = await withTimeout(
-            AutoModelForImageTextToText.from_pretrained(MODEL_ID, {
-                dtype: {
-                    embed_tokens: 'fp16',
-                    vision_encoder: 'q4',
-                    decoder_model_merged: 'q4',
-                },
-                device: 'webgpu',
-                progress_callback: (data) => {
-                    if (data.status === 'progress') {
-                        const fileName = data.file || 'unknown';
-                        const loaded = data.loaded || 0;
-                        const total = data.total || 1;
-
-                        fileProgress.set(fileName, { loaded, total });
-
-                        let sumLoaded = 0;
-                        let sumTotal = 0;
-                        for (const v of fileProgress.values()) {
-                            sumLoaded += v.loaded;
-                            sumTotal += v.total;
-                        }
-                        const percent =
-                            sumTotal > 0 ? Math.round((sumLoaded / sumTotal) * 100) : 0;
-
-                        post({
-                            type: 'progress',
-                            message: `Downloading model files... (${fileProgress.size} files)`,
-                            percent,
-                        });
-                    }
-                },
-            }),
-            MODEL_LOAD_TIMEOUT_MS,
-            'Model download'
-        );
+        model = await AutoModelForImageTextToText.from_pretrained(MODEL_ID, {
+            dtype: {
+                embed_tokens: 'fp16',
+                vision_encoder: 'q4',
+                decoder_model_merged: 'q4',
+            },
+            device: 'webgpu',
+            progress_callback: (data) => reportDownloadProgress(data, 'model'),
+        });
 
         isLoaded = true;
         post({ type: 'progress', message: 'Model loaded!', percent: 100 });

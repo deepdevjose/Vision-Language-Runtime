@@ -14,8 +14,8 @@ import {
 import { MODEL_CONFIG, QOS_PROFILES } from '../utils/constants.js';
 import webgpuDetector from '../utils/webgpu-detector.js';
 
-/** Timeout (ms) for model/processor downloads. */
-const MODEL_LOAD_TIMEOUT_MS = 120_000;
+/** GPU detection should fail quickly; model downloads intentionally have no timeout. */
+const GPU_DETECTION_TIMEOUT_MS = 30_000;
 const WEB_COMPAT_MODEL_FALLBACK = 'onnx-community/FastVLM-0.5B-ONNX';
 const PYTORCH_ONLY_MODEL_ID = 'apple/FastVLM-0.5B';
 
@@ -153,11 +153,64 @@ export class CoreInference {
         }
 
         this.isLoading = true;
-        const fileProgress = new Map();
+        const fileProgress = {
+            processor: new Map(),
+            model: new Map(),
+        };
         const modelId =
             MODEL_CONFIG.MODEL_ID === PYTORCH_ONLY_MODEL_ID
                 ? WEB_COMPAT_MODEL_FALLBACK
                 : MODEL_CONFIG.MODEL_ID;
+
+        const reportDownloadProgress = (data, phase) => {
+            const status = data?.status;
+            if (!['init', 'download', 'progress', 'done'].includes(status)) return;
+
+            const fileName = data.file || data.name || 'unknown';
+            const phaseProgress = fileProgress[phase];
+            const previous = phaseProgress.get(fileName) || { loaded: 0, total: 0 };
+            const loaded = Number(data.loaded);
+            const total = Number(data.total);
+
+            phaseProgress.set(fileName, {
+                loaded:
+                    status === 'done' && Number.isFinite(total) && total > 0
+                        ? total
+                        : Number.isFinite(loaded)
+                          ? loaded
+                          : previous.loaded,
+                total: Number.isFinite(total) && total > 0 ? total : previous.total,
+            });
+
+            let sumLoaded = 0;
+            let sumTotal = 0;
+            for (const file of phaseProgress.values()) {
+                sumLoaded += file.loaded;
+                sumTotal += file.total;
+            }
+
+            const callbackPercent = Number(data.progress);
+            const percent =
+                sumTotal > 0
+                    ? Math.round((sumLoaded / sumTotal) * 100)
+                    : Number.isFinite(callbackPercent) && callbackPercent >= 0
+                      ? Math.round(callbackPercent)
+                      : undefined;
+
+            onProgress?.(
+                phase === 'processor'
+                    ? `Downloading processor files... (${phaseProgress.size} files)`
+                    : `Downloading model files... (${phaseProgress.size} files)`,
+                percent,
+                {
+                    phase,
+                    percent,
+                    loaded: sumLoaded,
+                    total: sumTotal,
+                    files: phaseProgress.size,
+                }
+            );
+        };
 
         this.loadPromise = (async () => {
             try {
@@ -174,18 +227,14 @@ export class CoreInference {
                     );
                 }
 
-                // Parallelize GPU detection and processor loading
+                // Parallelize GPU detection and processor loading. There is deliberately
+                // no timeout around either model artifact download: slow connections can
+                // take longer than two minutes and the browser request can still progress.
                 const [gpuInfo, processor] = await Promise.all([
-                    withTimeout(
-                        webgpuDetector.detect(),
-                        MODEL_LOAD_TIMEOUT_MS,
-                        'GPU detection'
-                    ),
-                    withTimeout(
-                        AutoProcessor.from_pretrained(modelId),
-                        MODEL_LOAD_TIMEOUT_MS,
-                        'Processor download'
-                    ),
+                    withTimeout(webgpuDetector.detect(), GPU_DETECTION_TIMEOUT_MS, 'GPU detection'),
+                    AutoProcessor.from_pretrained(modelId, {
+                        progress_callback: (data) => reportDownloadProgress(data, 'processor'),
+                    }),
                 ]);
 
                 if (!gpuInfo.supported) {
@@ -208,49 +257,16 @@ export class CoreInference {
 
                 onProgress?.('Processor loaded. Loading model...', 10);
 
-                // Timeout on model download
-                this.model = await withTimeout(
-                    AutoModelForImageTextToText.from_pretrained(
-                        modelId,
-                        {
-                            dtype: {
-                                embed_tokens: 'fp16',
-                                vision_encoder: 'q4',
-                                decoder_model_merged: 'q4',
-                            },
-                            device: 'webgpu',
-                            // Weighted progress by bytes downloaded
-                            progress_callback: (data) => {
-                                if (data.status === 'progress') {
-                                    const fileName = data.file || 'unknown';
-                                    const loaded = data.loaded || 0;
-                                    const total = data.total || 1;
-
-                                    fileProgress.set(fileName, { loaded, total });
-
-                                    let sumLoaded = 0;
-                                    let sumTotal = 0;
-                                    for (const v of fileProgress.values()) {
-                                        sumLoaded += v.loaded;
-                                        sumTotal += v.total;
-                                    }
-                                    const overallPercent =
-                                        sumTotal > 0
-                                            ? Math.round((sumLoaded / sumTotal) * 100)
-                                            : 0;
-
-                                    // Emit raw 0–100; loading-screen maps to UI range
-                                    onProgress?.(
-                                        `Downloading model files... (${fileProgress.size} files)`,
-                                        overallPercent
-                                    );
-                                }
-                            },
-                        }
-                    ),
-                    MODEL_LOAD_TIMEOUT_MS,
-                    'Model download'
-                );
+                // Model downloads can be large and should finish on slow connections.
+                this.model = await AutoModelForImageTextToText.from_pretrained(modelId, {
+                    dtype: {
+                        embed_tokens: 'fp16',
+                        vision_encoder: 'q4',
+                        decoder_model_merged: 'q4',
+                    },
+                    device: 'webgpu',
+                    progress_callback: (data) => reportDownloadProgress(data, 'model'),
+                });
 
                 onProgress?.('Model loaded successfully!', 80);
                 this.isLoaded = true;

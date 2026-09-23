@@ -61,6 +61,10 @@ export function createLoadingScreen(onPhaseChange, onComplete, onError) {
     const progressLabel = createElement('span', { className: 'ls-progress-label', text: '0%' });
     progressWrap.appendChild(progressBar);
     progressWrap.appendChild(progressLabel);
+    const downloadDetails = createElement('div', {
+        className: 'ls-download-details',
+        text: 'Download size will appear when available',
+    });
 
     // Thinking log — the "AI is working" feel
     const thinkingRow = createElement('div', { className: 'ls-thinking' });
@@ -75,6 +79,7 @@ export function createLoadingScreen(onPhaseChange, onComplete, onError) {
     card.appendChild(header);
     card.appendChild(stepsList);
     card.appendChild(progressWrap);
+    card.appendChild(downloadDetails);
     card.appendChild(thinkingRow);
     wrapper.appendChild(card);
 
@@ -86,6 +91,14 @@ export function createLoadingScreen(onPhaseChange, onComplete, onError) {
         progressFill.style.width = progress + '%';
         progressLabel.textContent = Math.round(progress) + '%';
         if (thinking) thinkingText.textContent = thinking;
+    }
+
+    function formatBytes(bytes) {
+        if (!Number.isFinite(bytes) || bytes < 0) return null;
+        const units = ['B', 'KB', 'MB', 'GB'];
+        const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+        const value = bytes / 1024 ** unitIndex;
+        return `${value >= 100 || unitIndex === 0 ? Math.round(value) : value.toFixed(1)} ${units[unitIndex]}`;
     }
 
     function activateStep(id) {
@@ -151,7 +164,7 @@ export function createLoadingScreen(onPhaseChange, onComplete, onError) {
             setProgress(15, 'Resolving model dependencies...');
             logger.info('Loading phase: Model weights');
 
-            await vlmService.loadModel((message, progressPercent) => {
+            await vlmService.loadModel((message, progressPercent, downloadProgress) => {
                 let thinking = 'Downloading model weights...';
                 if (message.includes('Loading processor')) thinking = 'Initializing tokenizer...';
                 else if (message.includes('Processor loaded'))
@@ -160,12 +173,32 @@ export function createLoadingScreen(onPhaseChange, onComplete, onError) {
                 else if (message.includes('Model loaded'))
                     thinking = 'Optimizing execution graph...';
 
-                // Fix 6: core-inference emits raw 0–100; map to weights-step UI range (15–75%)
+                // The main bar represents the complete startup sequence. Keep the
+                // model's own download percentage in the detail line below it.
+                const downloadPct = Number(downloadProgress?.percent);
                 const pct =
-                    progressPercent !== undefined
-                        ? Math.max(progress, 15 + progressPercent * 0.6)
-                        : progress;
+                    downloadProgress?.phase === 'model' && Number.isFinite(downloadPct)
+                        ? Math.max(progress, 15 + downloadPct * 0.6)
+                        : downloadProgress?.phase === 'processor' && Number.isFinite(downloadPct)
+                          ? Math.max(progress, 10 + downloadPct * 0.05)
+                          : progressPercent !== undefined && message.includes('Loading model')
+                            ? Math.max(progress, 15 + progressPercent * 0.6)
+                            : progress;
                 setProgress(pct, thinking);
+
+                if (downloadProgress) {
+                    const loaded = formatBytes(downloadProgress.loaded);
+                    const total = formatBytes(downloadProgress.total);
+                    const phaseLabel =
+                        downloadProgress.phase === 'processor' ? 'Processor' : 'Model';
+                    const percentLabel = Number.isFinite(Number(downloadProgress.percent))
+                        ? `${Math.round(Number(downloadProgress.percent))}% · `
+                        : '';
+                    downloadDetails.textContent =
+                        loaded && total
+                            ? `${phaseLabel}: ${percentLabel}${loaded} / ${total} (${downloadProgress.files} files)`
+                            : `${phaseLabel}: ${percentLabel}${loaded || 'size pending'} downloaded (${downloadProgress.files} files; total unavailable)`;
+                }
             });
 
             completeStep('weights');

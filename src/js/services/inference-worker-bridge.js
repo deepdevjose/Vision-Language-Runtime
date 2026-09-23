@@ -67,7 +67,7 @@ export class InferenceWorkerBridge {
     _handleMessage(msg) {
         switch (msg.type) {
             case 'progress':
-                this._onProgress?.(msg.message, msg.percent);
+                this._onProgress?.(msg.message, msg.percent, msg.downloadProgress);
                 break;
 
             case 'loaded':
